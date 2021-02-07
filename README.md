@@ -12,24 +12,10 @@ git clone https://github.com/Mikroways/dotfiles.git ~/.dotfiles-mw
 Luego de correr los comandos anteriores se configurarán algunos programas
 utilizados desde la consola como por ejemplo:
 
-* zsh
-* vim
-* git
-* tmux
-
-## Pasos manuales requeridos
-
-El archivo gitconfig.local es necesario que se edite manualmente con los datos
-personales. Por ejemplo
-
-```ini
-[user]
-  name = Juan Perez
-  email = juan.perez@mikroways.net
-```
-
-> Se provee un archivo `gitconfig.local.sample` a modo de ejemplo que puede
-> copiarse como `gitconfig.local` y volver a correr el archivo
+- zsh
+- vim
+- git
+- tmux
 
 ## Cómo usar este repositorio
 
