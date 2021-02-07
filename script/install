@@ -1,22 +1,35 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
-DIR=$(realpath "$(dirname $0)/../")
+DIR=$(realpath "$(dirname "$0")/../")
 BACKUP_DIR=$DIR/backup
 
-mkdir -p $BACKUP_DIR
+mkdir -p "${BACKUP_DIR}"
 
-cd $DIR
+cd "${DIR}"
 
 for file in *; do
-  [[ "$file" =~ (script|backup|README.md|.*sample$) ]] && continue
-  [ -e ~/.$file -a ! -L ~/.$file ] && mv ~/.$file $BACKUP_DIR
-  ln -fs $DIR/$file ~/.$file
+  files_dest=~/.${file}
+  [[ "${file}" =~ (script|backup|README.md|.*sample$) ]] && continue
+  [ -e "${files_dest}" ] && [ ! -L "${files_dest}" ] && mv "${files_dest}" "${BACKUP_DIR}"
+  ln -fs "${DIR}"/"${file}" "${files_dest}"
 done
 
 # Install vim-plug as autoload
 curl -sfLo ~/.vim/autoload/plug.vim --create-dirs \
-    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 # Install vim plugins
 vim +PlugUpdate +qall
+
+# Setup Git
+echo "Setting up git..."
+
+default_name=$(git config --global user.name)
+default_email=$(git config --global user.email)
+
+read -rp "Name [$default_name]: " name
+read -rp "Email [$default_email]: " email
+
+git config --global user.name "${name:-$default_name}"
+git config --global user.email "${email:-$default_email}"
