@@ -6,7 +6,7 @@ La forma de instalar estos dotfiles es tan simple como ejecutar:
 
 ```bash
 git clone https://github.com/Mikroways/dotfiles.git ~/.dotfiles-mw
-~/.dotfiles/scripts/install
+~/.dotfiles-wm/scripts/install
 ```
 
 Luego de correr los comandos anteriores se configurarán algunos programas
