@@ -24,44 +24,39 @@ function mw-tools-upgrade() {
 
   echo "$today" > "$GIT_UPDATE_CHECK_FILE"
   for repo_dir in "${WATCHED_DIRS[@]}"; do
-    pushd "$repo_dir" > /dev/null || continue
-    IS_MAIN_BRANCH=$(LC_ALL=C git rev-parse --abbrev-ref HEAD | grep -iE "^main|master$")
+    IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^main|master$")
     if [[ -z "$IS_MAIN_BRANCH" ]]; then
       echo "  📢 Repository is not using main branch for $repo_dir. Please review"
     fi
-    popd > /dev/null
   done
   for repo_dir in "${WATCHED_DIRS[@]}"; do
-    pushd "$repo_dir" > /dev/null || continue
-    LOCAL_UPDATES=$(LC_ALL=C git status | grep -E "modified:|Untracked")
+    LOCAL_UPDATES=$(LC_ALL=C git -C $repo_dir status | grep -E "modified:|Untracked")
     if [[ ! -z "$LOCAL_UPDATES" ]]; then
-      echo "  🚩 There are local updates for $repo_dir. Please commit"
+      echo "  🚩 There are local updates for $repo_dir"
+      echo "     Verify changes and commit them. Share your changes"
       REPOS_WITH_LOCAL_UPDATES=1
     fi
-    popd > /dev/null
   done
   if [[ "$REPOS_WITH_LOCAL_UPDATES" -ne 0 ]]; then
     echo "Update check aborted because local changes must be resolved"
     return
   fi
+  echo "Updating remotes for..."
   for repo_dir in "${WATCHED_DIRS[@]}"; do
-    pushd "$repo_dir" > /dev/null || continue
-    git remote update &>/dev/null
+    echo "- $(basename $repo_dir)"
+    git -C $repo_dir remote update &>/dev/null
     UPDATES=$(LC_ALL=C git status -uno | grep "Your branch is behind")
     if [[ ! -z "$UPDATES" ]]; then
       echo "  ⚠️  There are updates for $repo_dir"
       REPOS_TO_UPDATE+=( $repo_dir )
     fi
-    popd > /dev/null
   done
   if [[ "${#REPOS_TO_UPDATE[@]}" -ne 0 ]]; then
     echo "¿Upgrade mikroways tools? (Y/N): "
     read -r answer
     if [[ "$( echo $answer | tr '[:upper:]' '[:lower:]')" == "y" ]]; then
       for repo_dir in "${REPOS_TO_UPDATE[@]}"; do
-        pushd "$repo_dir" > /dev/null || continue
-        git pull
-        popd > /dev/null
+        git -C $repo_dir pull
       done
       echo
       echo "  ✔️  Mikroways tools updated"
