@@ -45,7 +45,7 @@ function mw-tools-upgrade() {
   for repo_dir in "${WATCHED_DIRS[@]}"; do
     echo "- $(basename $repo_dir)"
     git -C $repo_dir remote update &>/dev/null
-    UPDATES=$(LC_ALL=C git status -uno | grep "Your branch is behind")
+    UPDATES=$(LC_ALL=C git -C $repo_dir status -uno | grep "Your branch is behind")
     if [[ ! -z "$UPDATES" ]]; then
       echo "  ⚠️  There are updates for $repo_dir"
       REPOS_TO_UPDATE+=( $repo_dir )
