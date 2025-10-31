@@ -15,7 +15,7 @@ let g:has_async = v:version >= 800 || has('nvim')
 call plug#begin('~/.vim/bundle')
 
 " Define bundles via Github repos
-Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
+" Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
 Plug 'junegunn/fzf.vim'
 " Plug 'fatih/vim-go'
 Plug 'pangloss/vim-javascript'
