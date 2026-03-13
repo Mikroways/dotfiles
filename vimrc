@@ -129,6 +129,8 @@ silent! call neomake#configure#automake('rw', 1000)
 " Spell-check Markdown files and Git Commit Messages
 autocmd FileType markdown setlocal spell
 autocmd FileType gitcommit setlocal spell
+autocmd FileType markdown setlocal shiftwidth=2 tabstop=2 softtabstop=2 expandtab
+
 
 " Local config
 if filereadable($HOME . "/.vimrc.local")
