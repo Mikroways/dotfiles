@@ -41,9 +41,9 @@ export GRANT_SSH_ACCESS_ROOT="$HOME/.mikroways/tools/mw-grant-ssh-access"
 [[ -x $GRANT_SSH_ACCESS_ROOT/bin/mw-grant-ssh-access ]] && export PATH="$GRANT_SSH_ACCESS_ROOT/bin:$PATH"
 
 # Enable mw secrets & bootstrap
-export MW_SECRETS_ROOT="$HOME/.mikroways/tools/mw-secrets"
-[[ -x $MW_SECRETS_ROOT/bin/mw-secrets ]] && export PATH="$MW_SECRETS_ROOT/bin:$PATH" && \
-  fpath=($MW_SECRETS_ROOT/shell-completion/zsh $fpath)
+export MW_BOOTSTRAP_ROOT="$HOME/.mikroways/tools/mw-bootstrap"
+[[ -x $MW_BOOTSTRAP_ROOT/bin/mw-bootstrap ]] && export PATH="$MW_BOOTSTRAP_ROOT/bin:$PATH" && \
+  fpath=($MW_BOOTSTRAP_ROOT/shell-completion/zsh $fpath)
 
 # -----------------------------------------------------------------------------
 # Enable krew
