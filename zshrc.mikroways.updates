@@ -7,14 +7,18 @@ GIT_UPDATE_CHECK_FILE="${HOME}/.mw-tools-upgrade.lock"
 
 function mw-tools-force-upgrade() {
   rm -f $GIT_UPDATE_CHECK_FILE
-  mw-tools-upgrade
+  mw-tools-upgrade "$@"
 }
 
-# Check for updates
+# Check for updates. Pass -y to auto-apply without prompt (useful for background/cron runs).
 function mw-tools-upgrade() {
+  local auto_yes=0
+  [[ "${1:-}" == "-y" ]] && auto_yes=1
+
   local today=$(date +%Y-%m-%d)
   local REPOS_TO_UPDATE=()
-  local REPOS_WITH_LOCAL_UPDATES=0
+  local REPOS_WITH_LOCAL_UPDATES=()
+
 
   # Verifica si ya se revisó hoy
   if [[ -f "$GIT_UPDATE_CHECK_FILE" && $(cat "$GIT_UPDATE_CHECK_FILE") == "$today" ]]; then
@@ -34,11 +38,12 @@ function mw-tools-upgrade() {
     if [[ ! -z "$LOCAL_UPDATES" ]]; then
       echo "  🚩 There are local updates for $repo_dir"
       echo "     Verify changes and commit them. Share your changes"
-      REPOS_WITH_LOCAL_UPDATES=1
+      REPOS_WITH_LOCAL_UPDATES+=( $(basename $repo_dir) )
     fi
   done
-  if [[ "$REPOS_WITH_LOCAL_UPDATES" -ne 0 ]]; then
+  if [[ "${#REPOS_WITH_LOCAL_UPDATES[@]}" -ne 0 ]]; then
     echo "Update check aborted because local changes must be resolved"
+    [[ $auto_yes -eq 1 ]] && echo "  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}" >> "${HOME}/.mw-tools-upgrade.warn"
     return
   fi
   echo "Updating remotes for..."
@@ -52,14 +57,20 @@ function mw-tools-upgrade() {
     fi
   done
   if [[ "${#REPOS_TO_UPDATE[@]}" -ne 0 ]]; then
-    echo "¿Upgrade mikroways tools? (Y/N): "
-    read -r answer
+    local answer
+    if [[ $auto_yes -eq 1 ]]; then
+      answer="y"
+    else
+      echo "¿Upgrade mikroways tools? (Y/N): "
+      read -r answer
+    fi
     if [[ "$( echo $answer | tr '[:upper:]' '[:lower:]')" == "y" ]]; then
       for repo_dir in "${REPOS_TO_UPDATE[@]}"; do
         git -C $repo_dir pull
       done
       echo
       echo "  ✔️  Mikroways tools updated"
+      [[ $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_TO_UPDATE:t}" >> "${HOME}/.mw-tools-upgrade.warn"
     else
       echo "  ❌ Omit updates for Mikroways tools"
     fi
@@ -68,5 +79,13 @@ function mw-tools-upgrade() {
 
 
 
-# Ejecutar la función en cada inicio de shell
-mw-tools-upgrade
+# Mostrar warnings del check anterior y lanzar nuevo check en background
+if [[ -f "${HOME}/.mw-tools-upgrade.warn" ]]; then
+  cat "${HOME}/.mw-tools-upgrade.warn"
+  rm -f "${HOME}/.mw-tools-upgrade.warn"
+fi
+{
+  local log="${HOME}/.mw-tools-upgrade.log"
+  [[ -f "$log" ]] && tail -500 "$log" > "${log}.tmp" && mv "${log}.tmp" "$log"
+  mw-tools-upgrade -y >> "$log" 2>&1
+} &!
