@@ -1,3 +1,7 @@
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 # Set PATH to use asdf
 export ASDF_DATA_DIR="${ASDF_DATA_DIR:-$HOME/.asdf}"
 path=("$ASDF_DATA_DIR/bin" $path)
@@ -21,7 +25,7 @@ bindkey "^u" backward-kill-line
 # Alias for common extensions
 alias -s {yaml,yml,json,md}=$EDITOR
 
-# Fix GPG AGENT 
+# Fix GPG AGENT
 export GPG_TTY=$TTY
 
 source ~/.antigen.zsh/antigen.zsh
@@ -46,7 +50,7 @@ antigen theme romkatv/powerlevel10k
 # Tell Antigen that you're done.
 antigen apply
 
-# Do not share hsitory between sessions
+# Do not share history between sessions
 unsetopt share_history
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
@@ -55,7 +59,7 @@ unsetopt share_history
 # Fuzzy find
 [[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
 
-# Load custom autocmplete
+# Load custom autocomplete
 fpath=($HOME/.zsh/completion $fpath)
 
 
@@ -64,7 +68,3 @@ fpath=($HOME/.zsh/completion $fpath)
 
 # Load Other User personalizations
 [ -f ~/.zshrc.user ] && source ~/.zshrc.user
-
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
