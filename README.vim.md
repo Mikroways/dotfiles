@@ -13,7 +13,7 @@ instalan con [vim-plug](https://github.com/junegunn/vim-plug).
 
 ## Ver las diferencias de un archivo modificado
 
-```
+```vim
 :w !diff % -
 ```
 
@@ -31,7 +31,7 @@ instalan con [vim-plug](https://github.com/junegunn/vim-plug).
 Para abrir un archivo bajo el árbol de directorios desde donde se abrió vim,
 podemos usar Ctrl+p. Esta acción invoca al comando `fzf` o [fuzzy
 finder](https://github.com/junegunn/fzf), que también funciona desde la consola,
-pero utilizando Ctrl+t. Esta utilidad en vim puede utilizarse en combinación de 
+pero utilizando Ctrl+t. Esta utilidad en vim puede utilizarse en combinación de
 ventanas y solapas.
 
 ## Uso de solapas

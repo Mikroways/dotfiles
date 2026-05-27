@@ -35,32 +35,32 @@ personales. Por ejemplo
 
 La idea es que cada integrante de Mikroways utilice este repositorio como punto
 de partida, pero personalice su ambiente como mejor le parezca, agregando nuevas
-configuraciones y proponiéndolas al repositorio raiz, compartiendo experiencias
+configuraciones y proponiéndolas al repositorio raíz, compartiendo experiencias
 que nos hagan más eficientes en el día a día.
 Para ello se puede forkear este repositorio y cualquier contribución realizarla
 como un Pull Request.
 
-### Personalizacions de Mikroways y Usuario
+### Personalizaciones de Mikroways y Usuario
 
-Las personalizaciones se pueden hacer en casacada de la siguiente forma:
+Las personalizaciones se pueden hacer en cascada de la siguiente forma:
 
 1. Primero se setean los valores por defecto en `.zshrc`
-1. Luego se personalizacion los valores por defecto para Mikroways usando
+1. Luego se personalizan los valores por defecto para Mikroways usando
    `.zshrc.mikroways`
 1. Finalmente, un usuario puede crear un archivo `.zshrc.user` que idealmente
    conviene no versionarlo en este repositorio con las personalizaciones que
-   desea sobreescrbir
+   desea sobreescribir
 1. Respecto a los bundles de antigen, es posible aplicar personalizaciones con:
   `.zshrc.mikroways.antigen.bundles` y `.zshrc.user.antigen.bundles`
 
 ## Integración con herramientas propias de mikroways
 
-* zshell autocomplete y configuraciones de ssh comartidas mediante [mw-sshconfig-sync](https://gitlab.com/mikroways/tools/mw-sshconfig-sync)
+* zshell autocomplete y configuraciones de ssh compartidas mediante [mw-sshconfig-sync](https://gitlab.com/mikroways/tools/mw-sshconfig-sync)
   o simplemente usando el cliente de nextcloud.
 * Conexión a las vpn de nuestros clientes usando
   [mw-vpn](https://gitlab.com/mikroways/tools/mw-vpn/). La idea es que cada
   usuario configure sus credenciales, pero ahorramos la forma de conectarte
-  agnósticamente a cada cliente. Aun nos queda el autocomplete de este comando.
+  agnósticamente a cada cliente. Aún nos queda el autocomplete de este comando.
 
 ## Sobre vim
 
