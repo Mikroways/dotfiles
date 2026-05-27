@@ -68,7 +68,7 @@ function mw-tools-upgrade() {
 
   # Fetch remotes en paralelo (ambos modos)
   local tmpdir=$(mktemp -d)
-  echo "Fetching remotes..."
+  local fetch_pids=()
   setopt LOCAL_OPTIONS
   unsetopt MONITOR
   for repo_dir in "${REPOS_MAIN[@]}"; do
@@ -76,14 +76,37 @@ function mw-tools-upgrade() {
     {
       local err
       if err=$(git -C $repo_dir remote update 2>&1 >/dev/null); then
-        echo 0
+        echo 0 > "$tmpdir/$key.tmp"
       else
-        echo 1
-        echo "$err" | grep -E "^(fatal|error|ERROR):" | head -1
+        { echo 1; echo "$err" | grep -E "^(fatal|error|ERROR):" | head -1 } > "$tmpdir/$key.tmp"
       fi
-    } > "$tmpdir/$key" &
+      mv "$tmpdir/$key.tmp" "$tmpdir/$key"
+    } &
+    fetch_pids+=($!)
   done
-  wait
+
+  if [[ $auto_yes -eq 0 ]]; then
+    local total=${#REPOS_MAIN}
+    local bar_width=20
+    while true; do
+      local completed=$(find "$tmpdir" -type f -not -name "*.tmp" | wc -l | tr -d ' ')
+      local filled=$(( completed * bar_width / total ))
+      local empty=$(( bar_width - filled ))
+      local bar=""
+      [[ $filled -gt 0 ]] && bar=$(printf '%.0s█' {1..$filled})
+      [[ $empty -gt 0 ]] && bar+=$(printf '%.0s░' {1..$empty})
+      printf "\r  Fetching remotes... [%s] %d/%d" "$bar" "$completed" "$total"
+      [[ $completed -ge $total ]] && break
+      sleep 0.1
+    done
+    printf "\n"
+  else
+    echo "Fetching remotes..."
+  fi
+
+  for pid in "${fetch_pids[@]}"; do
+    wait $pid 2>/dev/null
+  done
 
   # Verificar resultados
   echo "Checking for updates..."
