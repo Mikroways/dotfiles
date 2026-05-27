@@ -18,6 +18,7 @@ function mw-tools-upgrade() {
   local today=$(date +%Y-%m-%d)
   local REPOS_TO_UPDATE=()
   local REPOS_WITH_LOCAL_UPDATES=()
+  local REPOS_NOT_ON_MAIN=()
 
 
   # Verifica si ya se revisó hoy
@@ -28,12 +29,18 @@ function mw-tools-upgrade() {
 
   echo "$today" > "$GIT_UPDATE_CHECK_FILE"
   for repo_dir in "${WATCHED_DIRS[@]}"; do
-    IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^main|master$")
+    IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
     if [[ -z "$IS_MAIN_BRANCH" ]]; then
       echo "  📢 Repository is not using main branch for $repo_dir. Please review"
+      REPOS_NOT_ON_MAIN+=( $(basename $repo_dir) )
     fi
   done
+  if [[ "${#REPOS_NOT_ON_MAIN[@]}" -ne 0 ]]; then
+    [[ $auto_yes -eq 1 ]] && echo "  📢 mw-tools: repos en rama no principal: ${(j:, :)REPOS_NOT_ON_MAIN}" >> "${HOME}/.mw-tools-upgrade.warn"
+  fi
   for repo_dir in "${WATCHED_DIRS[@]}"; do
+    IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
+    [[ -z "$IS_MAIN_BRANCH" ]] && continue
     LOCAL_UPDATES=$(LC_ALL=C git -C $repo_dir status | grep -E "modified:|Untracked")
     if [[ ! -z "$LOCAL_UPDATES" ]]; then
       echo "  🚩 There are local updates for $repo_dir"
@@ -48,6 +55,8 @@ function mw-tools-upgrade() {
   fi
   echo "Updating remotes for..."
   for repo_dir in "${WATCHED_DIRS[@]}"; do
+    IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
+    [[ -z "$IS_MAIN_BRANCH" ]] && continue
     echo "- $(basename $repo_dir)"
     git -C $repo_dir remote update &>/dev/null
     UPDATES=$(LC_ALL=C git -C $repo_dir status -uno | grep "Your branch is behind")
