@@ -70,13 +70,13 @@ notifica al inicio de la **próxima** sesión de terminal.
 
 ### Comportamiento
 
-- **Una vez por día**: el chequeo corre a lo sumo una vez diaria (controlado por
+* **Una vez por día**: el chequeo corre a lo sumo una vez diaria (controlado por
   `~/.mw-tools-upgrade.lock`).
-- **Solo ramas principales**: los repositorios en una rama distinta a `main` o
+* **Solo ramas principales**: los repositorios en una rama distinta a `main` o
   `master` se reportan como advertencia pero no se actualizan automáticamente.
-- **Sin cambios locales**: si un repositorio tiene cambios sin commitear, se
+* **Sin cambios locales**: si un repositorio tiene cambios sin commitear, se
   aborta la actualización y se avisa.
-- **Notificaciones diferidas**: los avisos (actualizaciones disponibles, repos en
+* **Notificaciones diferidas**: los avisos (actualizaciones disponibles, repos en
   rama no principal, cambios locales sin commitear) se muestran al abrir la
   siguiente terminal, no mientras el chequeo corre en background.
 
@@ -84,9 +84,11 @@ notifica al inicio de la **próxima** sesión de terminal.
 
 | Comando | Descripción |
 |---|---|
-| `mw-tools-upgrade` | Chequea actualizaciones de forma interactiva |
-| `mw-tools-upgrade -y` | Chequea y aplica automáticamente (modo background) |
-| `mw-tools-force-upgrade` | Fuerza el chequeo ignorando el lock diario |
+| `mw-tools-upgrade` | Chequea actualizaciones una vez por día (interactivo) |
+| `mw-tools-upgrade -y` | Igual pero aplica automáticamente sin preguntar |
+| `mw-tools-upgrade -v` | Muestra el output completo del fetch por repo |
+| `mw-tools-force-upgrade` | Igual a `mw-tools-upgrade` pero ignora el lock diario — no hace falta borrar el lock manualmente |
+| `mw-tools-force-upgrade -v` | Force + verbose |
 
 ### Archivos relevantes
 

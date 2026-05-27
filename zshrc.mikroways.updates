@@ -6,16 +6,23 @@ WATCHED_DIRS=(${(f)"$(find $HOME/.mikroways -type d -name .git -exec dirname {} 
 GIT_UPDATE_CHECK_FILE="${HOME}/.mw-tools-upgrade.lock"
 
 function mw-tools-force-upgrade() {
+  echo "Forzando chequeo (ignorando lock diario)..."
   rm -f $GIT_UPDATE_CHECK_FILE
   mw-tools-upgrade "$@"
 }
 
-# Check for updates. Pass -y to auto-apply without prompt (useful for background/cron runs).
+# Check for updates.
+# Flags: -y auto-apply without prompt (background/cron), -v verbose fetch output
 function mw-tools-upgrade() {
   local auto_yes=0
-  [[ "${1:-}" == "-y" ]] && auto_yes=1
+  local verbose=0
+  for arg in "$@"; do
+    [[ "$arg" == "-y" ]] && auto_yes=1
+    [[ "$arg" == "-v" ]] && verbose=1
+  done
 
   local today=$(date +%Y-%m-%d)
+  local REPOS_MAIN=()
   local REPOS_TO_UPDATE=()
   local REPOS_WITH_LOCAL_UPDATES=()
   local REPOS_NOT_ON_MAIN=()
@@ -23,29 +30,31 @@ function mw-tools-upgrade() {
   local REPOS_UPDATED=()
   local REPOS_PULL_FAILED=()
 
-
   # Verifica si ya se revisó hoy
   if [[ -f "$GIT_UPDATE_CHECK_FILE" && $(cat "$GIT_UPDATE_CHECK_FILE") == "$today" ]]; then
     return
   fi
   echo "Checking for Mikroways tools updates...."
-
   echo "$today" > "$GIT_UPDATE_CHECK_FILE"
+
+  # Clasificar repos por rama
   for repo_dir in "${WATCHED_DIRS[@]}"; do
     IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
     if [[ -z "$IS_MAIN_BRANCH" ]]; then
       echo "  📢 Repository is not using main branch for $repo_dir. Please review"
       REPOS_NOT_ON_MAIN+=( $(basename $repo_dir) )
+    else
+      REPOS_MAIN+=( $repo_dir )
     fi
   done
   if [[ "${#REPOS_NOT_ON_MAIN[@]}" -ne 0 ]]; then
     [[ $auto_yes -eq 1 ]] && echo "  📢 mw-tools: repos en rama no principal: ${(j:, :)REPOS_NOT_ON_MAIN}" >> "${HOME}/.mw-tools-upgrade.warn"
   fi
-  for repo_dir in "${WATCHED_DIRS[@]}"; do
-    IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
-    [[ -z "$IS_MAIN_BRANCH" ]] && continue
+
+  # Verificar cambios locales (solo repos en rama principal)
+  for repo_dir in "${REPOS_MAIN[@]}"; do
     LOCAL_UPDATES=$(LC_ALL=C git -C $repo_dir status | grep -E "modified:|Untracked")
-    if [[ ! -z "$LOCAL_UPDATES" ]]; then
+    if [[ -n "$LOCAL_UPDATES" ]]; then
       echo "  🚩 There are local updates for $repo_dir"
       echo "     Verify changes and commit them. Share your changes"
       REPOS_WITH_LOCAL_UPDATES+=( $(basename $repo_dir) )
@@ -56,22 +65,50 @@ function mw-tools-upgrade() {
     [[ $auto_yes -eq 1 ]] && echo "  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}" >> "${HOME}/.mw-tools-upgrade.warn"
     return
   fi
-  echo "Updating remotes for..."
-  for repo_dir in "${WATCHED_DIRS[@]}"; do
-    IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
-    [[ -z "$IS_MAIN_BRANCH" ]] && continue
+
+  # Fetch remotes en paralelo (ambos modos)
+  local tmpdir=$(mktemp -d)
+  echo "Fetching remotes..."
+  setopt LOCAL_OPTIONS
+  unsetopt MONITOR
+  for repo_dir in "${REPOS_MAIN[@]}"; do
+    local key="${repo_dir//\//_}"
+    {
+      if git -C $repo_dir remote update &>/dev/null; then
+        echo 0
+      else
+        echo 1
+      fi
+    } > "$tmpdir/$key" &
+  done
+  wait
+
+  # Verificar resultados
+  echo "Checking for updates..."
+  for repo_dir in "${REPOS_MAIN[@]}"; do
+    local key="${repo_dir//\//_}"
+    local fetch_exit=$(cat "$tmpdir/$key" 2>/dev/null)
     echo "- $(basename $repo_dir)"
-    if ! git -C $repo_dir remote update &>/dev/null; then
+    if [[ "$fetch_exit" != "0" ]]; then
       echo "  ❌ Error al hacer fetch de $(basename $repo_dir)"
       REPOS_WITH_FETCH_ERROR+=( $(basename $repo_dir) )
       continue
     fi
     UPDATES=$(LC_ALL=C git -C $repo_dir status -uno | grep -E "Your branch is behind|have diverged")
-    if [[ ! -z "$UPDATES" ]]; then
+    if [[ -n "$UPDATES" ]]; then
+      local remote_branch="origin/$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD)"
+      local new_commits=$(git -C $repo_dir log HEAD..$remote_branch --oneline 2>/dev/null)
       echo "  ⚠️  There are updates for $repo_dir"
+      if [[ $verbose -eq 1 && -n "$new_commits" ]]; then
+        echo "$new_commits" | while IFS= read -r line; do
+          echo "     $line"
+        done
+      fi
       REPOS_TO_UPDATE+=( $repo_dir )
     fi
   done
+  rm -rf $tmpdir
+
   if [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]]; then
     [[ $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}" >> "${HOME}/.mw-tools-upgrade.warn"
   fi
