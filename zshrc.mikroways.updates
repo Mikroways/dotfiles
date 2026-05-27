@@ -19,6 +19,9 @@ function mw-tools-upgrade() {
   local REPOS_TO_UPDATE=()
   local REPOS_WITH_LOCAL_UPDATES=()
   local REPOS_NOT_ON_MAIN=()
+  local REPOS_WITH_FETCH_ERROR=()
+  local REPOS_UPDATED=()
+  local REPOS_PULL_FAILED=()
 
 
   # Verifica si ya se revisó hoy
@@ -58,13 +61,20 @@ function mw-tools-upgrade() {
     IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
     [[ -z "$IS_MAIN_BRANCH" ]] && continue
     echo "- $(basename $repo_dir)"
-    git -C $repo_dir remote update &>/dev/null
-    UPDATES=$(LC_ALL=C git -C $repo_dir status -uno | grep "Your branch is behind")
+    if ! git -C $repo_dir remote update &>/dev/null; then
+      echo "  ❌ Error al hacer fetch de $(basename $repo_dir)"
+      REPOS_WITH_FETCH_ERROR+=( $(basename $repo_dir) )
+      continue
+    fi
+    UPDATES=$(LC_ALL=C git -C $repo_dir status -uno | grep -E "Your branch is behind|have diverged")
     if [[ ! -z "$UPDATES" ]]; then
       echo "  ⚠️  There are updates for $repo_dir"
       REPOS_TO_UPDATE+=( $repo_dir )
     fi
   done
+  if [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]]; then
+    [[ $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}" >> "${HOME}/.mw-tools-upgrade.warn"
+  fi
   if [[ "${#REPOS_TO_UPDATE[@]}" -ne 0 ]]; then
     local answer
     if [[ $auto_yes -eq 1 ]]; then
@@ -75,11 +85,18 @@ function mw-tools-upgrade() {
     fi
     if [[ "$( echo $answer | tr '[:upper:]' '[:lower:]')" == "y" ]]; then
       for repo_dir in "${REPOS_TO_UPDATE[@]}"; do
-        git -C $repo_dir pull
+        if git -C $repo_dir pull; then
+          REPOS_UPDATED+=( $repo_dir )
+        else
+          echo "  ❌ Error al actualizar $(basename $repo_dir)"
+          REPOS_PULL_FAILED+=( $(basename $repo_dir) )
+        fi
       done
       echo
-      echo "  ✔️  Mikroways tools updated"
-      [[ $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_TO_UPDATE:t}" >> "${HOME}/.mw-tools-upgrade.warn"
+      [[ "${#REPOS_UPDATED[@]}" -ne 0 ]] && echo "  ✔️  Mikroways tools updated: ${(j:, :)REPOS_UPDATED:t}"
+      [[ "${#REPOS_UPDATED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_UPDATED:t}" >> "${HOME}/.mw-tools-upgrade.warn"
+      [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && echo "  ❌ Falló el pull de: ${(j:, :)REPOS_PULL_FAILED}"
+      [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: falló el pull de: ${(j:, :)REPOS_PULL_FAILED}" >> "${HOME}/.mw-tools-upgrade.warn"
     else
       echo "  ❌ Omit updates for Mikroways tools"
     fi
