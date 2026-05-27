@@ -62,6 +62,40 @@ Las personalizaciones se pueden hacer en cascada de la siguiente forma:
   usuario configure sus credenciales, pero ahorramos la forma de conectarte
   agnósticamente a cada cliente. Aún nos queda el autocomplete de este comando.
 
+## Actualización automática de herramientas Mikroways
+
+Al abrir una nueva terminal, se lanza en background un chequeo de actualizaciones
+para todos los repositorios git bajo `~/.mikroways/`. Si hay novedades, se
+notifica al inicio de la **próxima** sesión de terminal.
+
+### Comportamiento
+
+- **Una vez por día**: el chequeo corre a lo sumo una vez diaria (controlado por
+  `~/.mw-tools-upgrade.lock`).
+- **Solo ramas principales**: los repositorios en una rama distinta a `main` o
+  `master` se reportan como advertencia pero no se actualizan automáticamente.
+- **Sin cambios locales**: si un repositorio tiene cambios sin commitear, se
+  aborta la actualización y se avisa.
+- **Notificaciones diferidas**: los avisos (actualizaciones disponibles, repos en
+  rama no principal, cambios locales sin commitear) se muestran al abrir la
+  siguiente terminal, no mientras el chequeo corre en background.
+
+### Comandos disponibles
+
+| Comando | Descripción |
+|---|---|
+| `mw-tools-upgrade` | Chequea actualizaciones de forma interactiva |
+| `mw-tools-upgrade -y` | Chequea y aplica automáticamente (modo background) |
+| `mw-tools-force-upgrade` | Fuerza el chequeo ignorando el lock diario |
+
+### Archivos relevantes
+
+| Archivo | Propósito |
+|---|---|
+| `~/.mw-tools-upgrade.lock` | Evita chequeos repetidos el mismo día |
+| `~/.mw-tools-upgrade.warn` | Mensajes pendientes a mostrar en la próxima terminal |
+| `~/.mw-tools-upgrade.log` | Log del último chequeo en background |
+
 ## Sobre vim
 
 Dejamos algunos [tips sobre vim que hemos configurado con estos
