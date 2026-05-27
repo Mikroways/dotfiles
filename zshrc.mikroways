@@ -46,8 +46,8 @@ export MW_BOOTSTRAP_ROOT="$HOME/.mikroways/tools/mw-bootstrap"
   fpath=($MW_BOOTSTRAP_ROOT/shell-completion/zsh $fpath)
 
 # Enable mw skills (Claude Code + gemini-cli)
-# Los skills viven en cada marco; sparse clones bajo ~/.mikroways/marcos-tecnicos/
-for _mw_skill_dir in "$HOME/.mikroways/marcos-tecnicos"/*/skills/*/; do
+# Los skills viven en cada marco; sparse clones bajo ~/.mikroways/tools/mw-skills/sources/
+for _mw_skill_dir in "$HOME/.mikroways/tools/mw-skills/sources"/*/skills/*/; do
   [[ -d "$_mw_skill_dir" ]] || continue
   _mw_skill_name=$(basename "$_mw_skill_dir")
   [[ ! -e "$HOME/.claude/skills/$_mw_skill_name" ]] && \
