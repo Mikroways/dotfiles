@@ -74,10 +74,12 @@ function mw-tools-upgrade() {
   for repo_dir in "${REPOS_MAIN[@]}"; do
     local key="${repo_dir//\//_}"
     {
-      if git -C $repo_dir remote update &>/dev/null; then
+      local err
+      if err=$(git -C $repo_dir remote update 2>&1 >/dev/null); then
         echo 0
       else
         echo 1
+        echo "$err" | grep -E "^(fatal|error|ERROR):" | head -1
       fi
     } > "$tmpdir/$key" &
   done
@@ -87,24 +89,27 @@ function mw-tools-upgrade() {
   echo "Checking for updates..."
   for repo_dir in "${REPOS_MAIN[@]}"; do
     local key="${repo_dir//\//_}"
-    local fetch_exit=$(cat "$tmpdir/$key" 2>/dev/null)
-    echo "- $(basename $repo_dir)"
+    local repo_name=$(basename $repo_dir)
+    local fetch_exit=$(head -1 "$tmpdir/$key" 2>/dev/null)
+    local fetch_error=$(tail -n +2 "$tmpdir/$key" 2>/dev/null)
     if [[ "$fetch_exit" != "0" ]]; then
-      echo "  ❌ Error al hacer fetch de $(basename $repo_dir)"
-      REPOS_WITH_FETCH_ERROR+=( $(basename $repo_dir) )
+      echo "- $repo_name ❌  ${fetch_error:-fetch failed}"
+      REPOS_WITH_FETCH_ERROR+=( $repo_name )
       continue
     fi
     UPDATES=$(LC_ALL=C git -C $repo_dir status -uno | grep -E "Your branch is behind|have diverged")
     if [[ -n "$UPDATES" ]]; then
       local remote_branch="origin/$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD)"
       local new_commits=$(git -C $repo_dir log HEAD..$remote_branch --oneline 2>/dev/null)
-      echo "  ⚠️  There are updates for $repo_dir"
+      echo "- $repo_name ⚠️"
       if [[ $verbose -eq 1 && -n "$new_commits" ]]; then
         echo "$new_commits" | while IFS= read -r line; do
           echo "     $line"
         done
       fi
       REPOS_TO_UPDATE+=( $repo_dir )
+    else
+      echo "- $repo_name ✔️"
     fi
   done
   rm -rf $tmpdir
