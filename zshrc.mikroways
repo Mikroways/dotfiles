@@ -46,20 +46,17 @@ export MW_BOOTSTRAP_ROOT="$HOME/.mikroways/tools/mw-bootstrap"
   fpath=($MW_BOOTSTRAP_ROOT/shell-completion/zsh $fpath)
 
 # Enable mw skills (Claude Code + gemini-cli)
-MW_SKILLS_ROOT="$HOME/.mikroways/tools/mw-skills/skills"
-if [[ -d "$MW_SKILLS_ROOT" ]]; then
-  for _mw_skill_dir in "$MW_SKILLS_ROOT"/*/; do
-    _mw_skill_name=$(basename "$_mw_skill_dir")
-    # Claude Code
-    [[ ! -e "$HOME/.claude/skills/$_mw_skill_name" ]] && \
-      ln -s "$_mw_skill_dir" "$HOME/.claude/skills/$_mw_skill_name" 2>/dev/null
-    # gemini-cli
-    if [[ ! -e "$HOME/.gemini/skills/$_mw_skill_name" ]] && command -v gemini &>/dev/null; then
-      gemini skills link "$_mw_skill_dir" --consent 2>/dev/null
-    fi
-  done
-  unset _mw_skill_dir _mw_skill_name
-fi
+# Los skills viven en cada marco; sparse clones bajo ~/.mikroways/marcos-tecnicos/
+for _mw_skill_dir in "$HOME/.mikroways/marcos-tecnicos"/*/skills/*/; do
+  [[ -d "$_mw_skill_dir" ]] || continue
+  _mw_skill_name=$(basename "$_mw_skill_dir")
+  [[ ! -e "$HOME/.claude/skills/$_mw_skill_name" ]] && \
+    ln -s "$_mw_skill_dir" "$HOME/.claude/skills/$_mw_skill_name" 2>/dev/null
+  if [[ ! -e "$HOME/.gemini/skills/$_mw_skill_name" ]] && command -v gemini &>/dev/null; then
+    gemini skills link "$_mw_skill_dir" --consent 2>/dev/null
+  fi
+done
+unset _mw_skill_dir _mw_skill_name
 
 # -----------------------------------------------------------------------------
 # Enable krew
