@@ -40,8 +40,27 @@ ventanas y solapas.
 
 ## Uso de solapas
 
-Al abrir vim podemos además usar la opción `-p` para abrir varios archivos en
-solapas.
+Al abrir vim podemos usar la opción `-p` para abrir varios archivos en solapas:
+
+```bash
+vim -p archivo1 archivo2 archivo3
+```
+
+Desde dentro de vim también podemos abrir nuevas solapas:
+
+* `:tabnew <archivo>` abre un archivo en una solapa nueva
+* `:tabnew` abre una solapa vacía
+
+Para navegar entre solapas:
+
+* `gt` va a la solapa siguiente
+* `gT` va a la solapa anterior
+* `<número>gt` va directamente a la solapa número `<número>` (ej: `2gt`)
+
+Para cerrar solapas:
+
+* `:tabclose` cierra la solapa actual
+* `:tabonly` cierra todas las solapas excepto la actual
 
 ## Uso de ventanas
 
