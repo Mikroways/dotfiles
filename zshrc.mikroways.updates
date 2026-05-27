@@ -112,6 +112,9 @@ function mw-tools-upgrade() {
   if [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]]; then
     [[ $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}" >> "${HOME}/.mw-tools-upgrade.warn"
   fi
+  if [[ "${#REPOS_TO_UPDATE[@]}" -eq 0 && "${#REPOS_WITH_FETCH_ERROR[@]}" -eq 0 ]]; then
+    echo "  ✔️  All tools up to date"
+  fi
   if [[ "${#REPOS_TO_UPDATE[@]}" -ne 0 ]]; then
     local answer
     if [[ $auto_yes -eq 1 ]]; then
