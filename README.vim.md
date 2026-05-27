@@ -11,9 +11,13 @@ instalan con [vim-plug](https://github.com/junegunn/vim-plug).
 
 ## Grabar acciones repetitivas
 
+Para grabar una secuencia de comandos, se usa `q` seguido de una letra (ej: `qa`
+para grabar en el registro `a`). Para detener la grabación, se usa `q` nuevamente.
+Para ejecutar la macro grabada, se usa `@a` (o `@@` para repetir la última).
+
 ## Ver las diferencias de un archivo modificado
 
-```
+```vim
 :w !diff % -
 ```
 
@@ -31,15 +35,32 @@ instalan con [vim-plug](https://github.com/junegunn/vim-plug).
 Para abrir un archivo bajo el árbol de directorios desde donde se abrió vim,
 podemos usar Ctrl+p. Esta acción invoca al comando `fzf` o [fuzzy
 finder](https://github.com/junegunn/fzf), que también funciona desde la consola,
-pero utilizando Ctrl+t. Esta utilidad en vim puede utilizarse en combinación de 
+pero utilizando Ctrl+t. Esta utilidad en vim puede utilizarse en combinación de
 ventanas y solapas.
 
 ## Uso de solapas
 
-TODO
+Al abrir vim podemos usar la opción `-p` para abrir varios archivos en solapas:
 
-Al abrir vim podemos además usar la opción `-p` para abrir varios archivos en
-solapas.
+```bash
+vim -p archivo1 archivo2 archivo3
+```
+
+Desde dentro de vim también podemos abrir nuevas solapas:
+
+* `:tabnew <archivo>` abre un archivo en una solapa nueva
+* `:tabnew` abre una solapa vacía
+
+Para navegar entre solapas:
+
+* `gt` va a la solapa siguiente
+* `gT` va a la solapa anterior
+* `<número>gt` va directamente a la solapa número `<número>` (ej: `2gt`)
+
+Para cerrar solapas:
+
+* `:tabclose` cierra la solapa actual
+* `:tabonly` cierra todas las solapas excepto la actual
 
 ## Uso de ventanas
 
