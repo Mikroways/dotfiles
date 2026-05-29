@@ -2,6 +2,9 @@
 MW_TOOLS_DIR=$HOME/.mikroways/tools
 WATCHED_DIRS=(${(f)"$(find $HOME/.mikroways -type d -name .git -exec dirname {} \;)"})
 
+# Scripts de post-update a buscar en cada repo (se ejecuta el primero que exista y sea ejecutable)
+MW_POST_UPDATE_SCRIPTS=(script/install install.sh)
+
 # Last check timestamp file
 GIT_UPDATE_CHECK_FILE="${HOME}/.mw-tools-upgrade.lock"
 
@@ -25,6 +28,7 @@ function mw-tools-upgrade() {
   local REPOS_MAIN=()
   local REPOS_TO_UPDATE=()
   local REPOS_WITH_LOCAL_UPDATES=()
+  local REPOS_WITH_LOCAL_UPDATES_PATHS=()
   local REPOS_NOT_ON_MAIN=()
   local REPOS_WITH_FETCH_ERROR=()
   local REPOS_UPDATED=()
@@ -34,7 +38,9 @@ function mw-tools-upgrade() {
   if [[ -f "$GIT_UPDATE_CHECK_FILE" && $(cat "$GIT_UPDATE_CHECK_FILE") == "$today" ]]; then
     return
   fi
+  printf '%0.s=' {1..80}; echo
   echo "Checking for Mikroways tools updates...."
+  printf '%0.s=' {1..80}; echo
   echo "$today" > "$GIT_UPDATE_CHECK_FILE"
 
   # Clasificar repos por rama
@@ -42,7 +48,7 @@ function mw-tools-upgrade() {
     IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
     if [[ -z "$IS_MAIN_BRANCH" ]]; then
       echo "  📢 Repository is not using main branch for $repo_dir. Please review"
-      REPOS_NOT_ON_MAIN+=( $(basename $repo_dir) )
+      REPOS_NOT_ON_MAIN+=( $repo_dir )
     else
       REPOS_MAIN+=( $repo_dir )
     fi
@@ -57,13 +63,14 @@ function mw-tools-upgrade() {
     if [[ -n "$LOCAL_UPDATES" ]]; then
       echo "  🚩 There are local updates for $repo_dir"
       echo "     Verify changes and commit them. Share your changes"
-      REPOS_WITH_LOCAL_UPDATES+=( $(basename $repo_dir) )
+      REPOS_WITH_LOCAL_UPDATES+=( $repo_dir )
+      REPOS_WITH_LOCAL_UPDATES_PATHS+=( $repo_dir )
     fi
   done
   if [[ "${#REPOS_WITH_LOCAL_UPDATES[@]}" -ne 0 ]]; then
-    echo "Update check aborted because local changes must be resolved"
+    echo "  ⚠️  Repos with local changes (skipped): ${(j:, :)REPOS_WITH_LOCAL_UPDATES}"
     [[ $auto_yes -eq 1 ]] && echo "  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}" >> "${HOME}/.mw-tools-upgrade.warn"
-    return
+    REPOS_MAIN=("${(@)REPOS_MAIN:|REPOS_WITH_LOCAL_UPDATES_PATHS}")
   fi
 
   # Fetch remotes en paralelo (ambos modos)
@@ -109,14 +116,16 @@ function mw-tools-upgrade() {
   done
 
   # Verificar resultados
+  printf '%0.s-' {1..80}; echo
   echo "Checking for updates..."
+  printf '%0.s-' {1..80}; echo
   for repo_dir in "${REPOS_MAIN[@]}"; do
     local key="${repo_dir//\//_}"
-    local repo_name=$(basename $repo_dir)
+    local repo_name=$repo_dir
     local fetch_exit=$(head -1 "$tmpdir/$key" 2>/dev/null)
     local fetch_error=$(tail -n +2 "$tmpdir/$key" 2>/dev/null)
     if [[ "$fetch_exit" != "0" ]]; then
-      echo "- $repo_name ❌  ${fetch_error:-fetch failed}"
+      echo "❌  $repo_name  ❌  ${fetch_error:-fetch failed}"
       REPOS_WITH_FETCH_ERROR+=( $repo_name )
       continue
     fi
@@ -124,7 +133,7 @@ function mw-tools-upgrade() {
     if [[ -n "$UPDATES" ]]; then
       local remote_branch="origin/$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD)"
       local new_commits=$(git -C $repo_dir log HEAD..$remote_branch --oneline 2>/dev/null)
-      echo "- $repo_name ⚠️"
+      echo "⚠️  $repo_name"
       if [[ $verbose -eq 1 && -n "$new_commits" ]]; then
         echo "$new_commits" | while IFS= read -r line; do
           echo "     $line"
@@ -132,7 +141,7 @@ function mw-tools-upgrade() {
       fi
       REPOS_TO_UPDATE+=( $repo_dir )
     else
-      echo "- $repo_name ✔️"
+      echo "✅  $repo_name"
     fi
   done
   rm -rf $tmpdir
@@ -141,28 +150,43 @@ function mw-tools-upgrade() {
     [[ $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}" >> "${HOME}/.mw-tools-upgrade.warn"
   fi
   if [[ "${#REPOS_TO_UPDATE[@]}" -eq 0 && "${#REPOS_WITH_FETCH_ERROR[@]}" -eq 0 ]]; then
-    echo "  ✔️  All tools up to date"
+    printf '%0.s-' {1..80}; echo
+    echo "✔️  All tools up to date"
   fi
   if [[ "${#REPOS_TO_UPDATE[@]}" -ne 0 ]]; then
     local answer
     if [[ $auto_yes -eq 1 ]]; then
       answer="y"
     else
-      echo "¿Upgrade mikroways tools? (Y/N): "
-      read -r answer
+      local input
+      while true; do
+        printf "¿Upgrade mikroways tools? [Y/n] (default: Y): "
+        read -r input
+        [[ -z "$input" ]] && { answer="y"; break }
+        [[ "$input" == [yY] ]] && { answer="y"; break }
+        [[ "$input" == [nN] ]] && { answer="n"; break }
+      done
     fi
-    if [[ "$( echo $answer | tr '[:upper:]' '[:lower:]')" == "y" ]]; then
+    if [[ "$answer" == "y" ]]; then
       for repo_dir in "${REPOS_TO_UPDATE[@]}"; do
         if git -C $repo_dir pull; then
           REPOS_UPDATED+=( $repo_dir )
+          for _post_script in "${MW_POST_UPDATE_SCRIPTS[@]}"; do
+            if [[ -x "$repo_dir/$_post_script" ]]; then
+              echo "  🔧 Running $_post_script for $repo_dir..."
+              "$repo_dir/$_post_script"
+              break
+            fi
+          done
+          unset _post_script
         else
-          echo "  ❌ Error al actualizar $(basename $repo_dir)"
-          REPOS_PULL_FAILED+=( $(basename $repo_dir) )
+          echo "  ❌ Error al actualizar $repo_dir"
+          REPOS_PULL_FAILED+=( $repo_dir )
         fi
       done
       echo
-      [[ "${#REPOS_UPDATED[@]}" -ne 0 ]] && echo "  ✔️  Mikroways tools updated: ${(j:, :)REPOS_UPDATED:t}"
-      [[ "${#REPOS_UPDATED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_UPDATED:t}" >> "${HOME}/.mw-tools-upgrade.warn"
+      [[ "${#REPOS_UPDATED[@]}" -ne 0 ]] && echo "  ✔️  Mikroways tools updated: ${(j:, :)REPOS_UPDATED}"
+      [[ "${#REPOS_UPDATED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_UPDATED}" >> "${HOME}/.mw-tools-upgrade.warn"
       [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && echo "  ❌ Falló el pull de: ${(j:, :)REPOS_PULL_FAILED}"
       [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: falló el pull de: ${(j:, :)REPOS_PULL_FAILED}" >> "${HOME}/.mw-tools-upgrade.warn"
     else
