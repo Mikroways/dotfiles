@@ -19,8 +19,16 @@ utilizados desde la consola como por ejemplo:
 
 ## Pasos manuales requeridos
 
-El archivo gitconfig.local es necesario que se edite manualmente con los datos
-personales. Por ejemplo
+### Configuración personal de git
+
+El archivo `gitconfig.local` contiene datos personales (nombre, email) y **no
+forma parte del repositorio**. Debe crearse directamente en el home:
+
+```bash
+cp ~/.mikroways/dotfiles/gitconfig.local.sample ~/.gitconfig.local
+```
+
+Luego editarlo con los datos reales:
 
 ```ini
 [user]
@@ -28,8 +36,9 @@ personales. Por ejemplo
   email = juan.perez@mikroways.net
 ```
 
-> Se provee un archivo `gitconfig.local.sample` a modo de ejemplo que puede
-> copiarse como `gitconfig.local` y volver a correr el archivo
+El `gitconfig` del repo lo incluye automáticamente vía `[include]`, por lo que
+cualquier valor definido en `~/.gitconfig.local` sobreescribe la configuración
+compartida sin generar cambios en el repositorio.
 
 ## Cómo usar este repositorio
 
