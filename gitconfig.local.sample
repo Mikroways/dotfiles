@@ -1,3 +1,32 @@
 [user]
   name = Juan Perez
   email = juan.perez@mikroways.net
+
+# Configuración por contexto (opcional)
+#
+# Permite usar una identidad distinta (email, firma) para ciertos repos.
+# Caso típico: repos personales con un email distinto al de Mikroways.
+#
+# --- Opción 1: por carpeta (recomendado, funciona con cualquier versión de git)
+#
+# [includeIf "gitdir:~/personal/"]
+#   path = ~/.gitconfig.personal
+#
+# --- Opción 2: por URL del remote (requiere git >= 2.36)
+#
+# Organización en GitHub (SSH y HTTPS):
+# [includeIf "hasconfig:remote.*.url:git@github.com:mi-org/**"]
+#   path = ~/.gitconfig.mi-org
+# [includeIf "hasconfig:remote.*.url:https://github.com/mi-org/**"]
+#   path = ~/.gitconfig.mi-org
+#
+# GitLab privado — en SSH el separador entre host y ruta es ":" en lugar de "/":
+# [includeIf "hasconfig:remote.*.url:git@gitlab.empresa.com:**"]
+#   path = ~/.gitconfig.empresa
+# [includeIf "hasconfig:remote.*.url:https://gitlab.empresa.com/**"]
+#   path = ~/.gitconfig.empresa
+#
+# En cada archivo referenciado solo ponés lo que difiere del default:
+#
+# [user]
+#   email = juan.perez@personal.com
