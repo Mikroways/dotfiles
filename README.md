@@ -85,9 +85,13 @@ notifica al inicio de la **próxima** sesión de terminal.
   `master` se reportan como advertencia pero no se actualizan automáticamente.
 * **Sin cambios locales**: si un repositorio tiene cambios sin commitear, se
   aborta la actualización y se avisa.
-* **Notificaciones diferidas**: los avisos (actualizaciones disponibles, repos en
-  rama no principal, cambios locales sin commitear) se muestran al abrir la
-  siguiente terminal, no mientras el chequeo corre en background.
+* **Notificaciones diferidas**: los avisos se muestran al abrir la siguiente
+  terminal, no mientras el chequeo corre en background. Hay dos tipos:
+  * **Problemas** (`.warn`): cambios locales sin commitear, repo en rama no
+    principal, errores de fetch/pull — persisten en cada terminal hasta que se
+    resuelvan.
+  * **Actualizaciones** (`.notify`): repos actualizados correctamente — se
+    muestran una sola vez y se eliminan automáticamente.
 
 ### Comandos disponibles
 
@@ -104,8 +108,18 @@ notifica al inicio de la **próxima** sesión de terminal.
 | Archivo | Propósito |
 |---|---|
 | `~/.mw-tools-upgrade.lock` | Evita chequeos repetidos el mismo día |
-| `~/.mw-tools-upgrade.warn` | Mensajes pendientes a mostrar en la próxima terminal |
+| `~/.mw-tools-upgrade.warn` | Problemas que requieren acción (persiste hasta resolverlos) |
+| `~/.mw-tools-upgrade.notify` | Notificación de repos actualizados (se elimina al mostrarse) |
 | `~/.mw-tools-upgrade.log` | Log del último chequeo en background |
+
+### Tests
+
+El comportamiento del sistema de updates está cubierto por `test-updates.sh`:
+
+```sh
+zsh test-updates.sh        # corre todos los tests
+zsh test-updates.sh -v     # verbose: muestra estado de archivos y log en cada test
+```
 
 ## Sobre vim
 
