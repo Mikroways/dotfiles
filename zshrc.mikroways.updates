@@ -7,8 +7,10 @@ MW_POST_UPDATE_SCRIPTS=(script/install install.sh)
 
 # Last check timestamp file
 GIT_UPDATE_CHECK_FILE="${HOME}/.mw-tools-upgrade.lock"
-# Problemas pendientes (se muestra en cada terminal hasta que se resuelvan)
-MW_PENDING_FILE="${HOME}/.mw-tools-upgrade.pending"
+# Problemas que requieren acción (persiste en cada terminal hasta que se resuelvan)
+MW_WARN_FILE="${HOME}/.mw-tools-upgrade.warn"
+# Notificaciones de una sola vez (repos actualizados)
+MW_NOTIFY_FILE="${HOME}/.mw-tools-upgrade.notify"
 
 function mw-tools-force-upgrade() {
   echo "Forzando chequeo (ignorando lock diario)..."
@@ -180,7 +182,7 @@ function mw-tools-upgrade() {
       done
       echo
       [[ "${#REPOS_UPDATED[@]}" -ne 0 ]] && echo "  ✔️  Mikroways tools updated: ${(j:, :)REPOS_UPDATED}"
-      [[ "${#REPOS_UPDATED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_UPDATED}" >> "${HOME}/.mw-tools-upgrade.warn"
+      [[ "${#REPOS_UPDATED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_UPDATED}" >> "$MW_NOTIFY_FILE"
       [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && echo "  ❌ Falló el pull de: ${(j:, :)REPOS_PULL_FAILED}"
     else
       echo "  ❌ Omit updates for Mikroways tools"
@@ -190,30 +192,30 @@ function mw-tools-upgrade() {
   # Siempre escribir el lock para no disparar background en cada terminal
   echo "$today" > "$GIT_UPDATE_CHECK_FILE"
 
-  # Actualizar archivo de problemas pendientes (se muestra en cada terminal hasta que se resuelvan)
-  local pending_msgs=()
-  [[ "${#REPOS_NOT_ON_MAIN[@]}" -ne 0 ]] && pending_msgs+=("  📢 mw-tools: repos en rama no principal: ${(j:, :)REPOS_NOT_ON_MAIN}")
-  [[ "${#REPOS_WITH_LOCAL_UPDATES[@]}" -ne 0 ]] && pending_msgs+=("  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}")
-  [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]] && pending_msgs+=("  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}")
-  [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && pending_msgs+=("  ❌ mw-tools: falló el pull de: ${(j:, :)REPOS_PULL_FAILED}")
+  # Actualizar .warn con problemas que requieren acción (persiste hasta que se resuelvan)
+  local warn_msgs=()
+  [[ "${#REPOS_NOT_ON_MAIN[@]}" -ne 0 ]] && warn_msgs+=("  📢 mw-tools: repos en rama no principal: ${(j:, :)REPOS_NOT_ON_MAIN}")
+  [[ "${#REPOS_WITH_LOCAL_UPDATES[@]}" -ne 0 ]] && warn_msgs+=("  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}")
+  [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]] && warn_msgs+=("  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}")
+  [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && warn_msgs+=("  ❌ mw-tools: falló el pull de: ${(j:, :)REPOS_PULL_FAILED}")
 
-  if [[ "${#pending_msgs[@]}" -ne 0 ]]; then
-    printf '%s\n' "${pending_msgs[@]}" > "$MW_PENDING_FILE"
+  if [[ "${#warn_msgs[@]}" -ne 0 ]]; then
+    printf '%s\n' "${warn_msgs[@]}" > "$MW_WARN_FILE"
   else
-    rm -f "$MW_PENDING_FILE"
+    rm -f "$MW_WARN_FILE"
   fi
 }
 
 
 
-# Mostrar problemas persistentes (se repite en cada terminal hasta que se resuelvan)
-if [[ -f "$MW_PENDING_FILE" ]]; then
-  cat "$MW_PENDING_FILE"
+# Mostrar problemas que requieren acción (persiste en cada terminal hasta que se resuelvan)
+if [[ -f "$MW_WARN_FILE" ]]; then
+  cat "$MW_WARN_FILE"
 fi
 # Mostrar notificaciones de una sola vez (ej: repos actualizados)
-if [[ -f "${HOME}/.mw-tools-upgrade.warn" ]]; then
-  cat "${HOME}/.mw-tools-upgrade.warn"
-  rm -f "${HOME}/.mw-tools-upgrade.warn"
+if [[ -f "$MW_NOTIFY_FILE" ]]; then
+  cat "$MW_NOTIFY_FILE"
+  rm -f "$MW_NOTIFY_FILE"
 fi
 if [[ ! -f "$GIT_UPDATE_CHECK_FILE" || $(cat "$GIT_UPDATE_CHECK_FILE" 2>/dev/null) != "$(date +%Y-%m-%d)" ]]; then
   echo "  🔄 mw-tools: chequeando actualizaciones en background..."

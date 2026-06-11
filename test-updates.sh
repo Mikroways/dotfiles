@@ -22,9 +22,9 @@ section() { echo "\n${YELLOW}${BOLD}$1${NC}" }
 TMPDIR_TEST=$(mktemp -d)
 export HOME="$TMPDIR_TEST"
 WARN="${HOME}/.mw-tools-upgrade.warn"
+NOTIFY="${HOME}/.mw-tools-upgrade.notify"
 LOCK="${HOME}/.mw-tools-upgrade.lock"
 LOG="${HOME}/.mw-tools-upgrade.log"
-PENDING="${HOME}/.mw-tools-upgrade.pending"
 
 cleanup() { rm -rf "$TMPDIR_TEST" }
 trap cleanup EXIT
@@ -95,13 +95,12 @@ _show_file_content() {
   fi
 }
 
-# Muestra el estado de lock/warn/pending/log antes de correr
 _show_before() {
   [[ $VERBOSE -eq 0 ]] && return
   echo "${CYAN}  Antes:${NC}"
   _show_file_content "lock" "$LOCK"
   _show_file_content "warn" "$WARN"
-  _show_file_content "pending" "$PENDING"
+  _show_file_content "notify" "$NOTIFY"
   if [[ -f "$LOG" ]]; then
     echo "${GRAY}    log:  $(wc -l < $LOG) líneas existentes${NC}"
   else
@@ -109,7 +108,6 @@ _show_before() {
   fi
 }
 
-# Muestra lo que produjo la última corrida: nuevas líneas en log + estado de warn/pending/lock
 _show_after() {
   local lines_before="$1"
   [[ $VERBOSE -eq 0 ]] && return
@@ -126,18 +124,16 @@ _show_after() {
   fi
 
   _show_file_content "warn" "$WARN"
-  _show_file_content "pending" "$PENDING"
+  _show_file_content "notify" "$NOTIFY"
   _show_file_content "lock" "$LOCK"
 }
 
-# Resetea el entorno y muestra qué repo se va a usar
 reset_env() {
   local repo_label="$1"
-  rm -f "$LOCK" "$WARN" "$LOG" "$PENDING"
+  rm -f "$LOCK" "$WARN" "$NOTIFY" "$LOG"
   [[ $VERBOSE -eq 1 ]] && echo "${CYAN}  Repo bajo prueba: ${repo_label}${NC}"
 }
 
-# Corre mw-tools-upgrade -y y muestra antes/después en verbose
 run_upgrade() {
   local lines_before=0
   [[ -f "$LOG" ]] && lines_before=$(wc -l < "$LOG")
@@ -198,7 +194,7 @@ fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 3: Repo al día — no se escribe warn ni pending"
+section "TEST 3: Repo al día — no se escribe warn ni notify"
 # ══════════════════════════════════════════════════════════════════════════════
 
 reset_env "uptodate (repo al día, sin updates remotos)"
@@ -206,14 +202,14 @@ WATCHED_DIRS=("$REPO_UPTODATE")
 
 run_upgrade
 if [[ ! -f "$WARN" ]]; then
-  pass "Sin updates: warn no creado (sin ruido innecesario)"
+  pass "Sin updates: warn no creado"
 else
   fail "Sin updates: warn creado innecesariamente — contenido: $(cat $WARN)"
 fi
-if [[ ! -f "$PENDING" ]]; then
-  pass "Sin updates: pending no creado"
+if [[ ! -f "$NOTIFY" ]]; then
+  pass "Sin updates: notify no creado"
 else
-  fail "Sin updates: pending creado innecesariamente — contenido: $(cat $PENDING)"
+  fail "Sin updates: notify creado innecesariamente — contenido: $(cat $NOTIFY)"
 fi
 if grep -q "✅" "$LOG"; then
   pass "Sin updates: log muestra ✅"
@@ -223,22 +219,27 @@ fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 4: Repo con update disponible — se actualiza y warn se escribe"
+section "TEST 4: Repo con update disponible — notify escrito, warn NO escrito"
 # ══════════════════════════════════════════════════════════════════════════════
 
 reset_env "needsupdate (remote tiene un commit nuevo)"
 WATCHED_DIRS=("$REPO_NEEDSUPDATE")
 
 run_upgrade
-if [[ -f "$WARN" ]]; then
-  pass "Con update: warn creado"
-  if grep -q "actualizadas" "$WARN"; then
-    pass "Warn contiene el mensaje de actualización"
+if [[ -f "$NOTIFY" ]]; then
+  pass "Con update: notify creado"
+  if grep -q "actualizadas" "$NOTIFY"; then
+    pass "Notify contiene el mensaje de actualización"
   else
-    fail "Warn existe pero no menciona 'actualizadas': $(cat $WARN)"
+    fail "Notify existe pero no menciona 'actualizadas': $(cat $NOTIFY)"
   fi
 else
-  fail "Con update: warn NO fue creado — el usuario no se entera del update"
+  fail "Con update: notify NO fue creado — el usuario no se entera del update"
+fi
+if [[ ! -f "$WARN" ]] || [[ ! -s "$WARN" ]]; then
+  pass "Con update: warn no escrito (no hay problemas que requieran acción)"
+else
+  fail "Con update: warn escrito innecesariamente — contenido: $(cat $WARN)"
 fi
 if grep -q "⚠️" "$LOG"; then
   pass "Log muestra ⚠️ para el repo con update"
@@ -248,56 +249,69 @@ fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 5: Warn se muestra y se limpia al abrir el siguiente shell"
+section "TEST 5: Notify se muestra una vez y se borra — warn persiste"
 # ══════════════════════════════════════════════════════════════════════════════
 
-echo "  ✔️  mw-tools: actualizadas: /fake/repo" > "$WARN"
-[[ $VERBOSE -eq 1 ]] && { echo "${CYAN}  Antes:${NC}"; _show_file_content "warn" "$WARN" }
+echo "  ✔️  mw-tools: actualizadas: /fake/repo" > "$NOTIFY"
+echo "  🚩 mw-tools: cambios locales sin commitear en: /fake/repo" > "$WARN"
+[[ $VERBOSE -eq 1 ]] && { echo "${CYAN}  Antes:${NC}"; _show_file_content "notify" "$NOTIFY"; _show_file_content "warn" "$WARN" }
 
-local output
-output=$(
-  if [[ -f "$WARN" ]]; then
-    cat "$WARN"
-    rm -f "$WARN"
-  fi
-)
+local notify_output warn_output
+notify_output=$(if [[ -f "$NOTIFY" ]]; then cat "$NOTIFY"; rm -f "$NOTIFY"; fi)
+warn_output=$(if [[ -f "$WARN" ]]; then cat "$WARN"; fi)
 
-[[ $VERBOSE -eq 1 ]] && { echo "${CYAN}  Después:${NC}"; echo "${GRAY}    output mostrado: $output${NC}"; _show_file_content "warn" "$WARN" }
+[[ $VERBOSE -eq 1 ]] && {
+  echo "${CYAN}  Después:${NC}"
+  echo "${GRAY}    notify mostrado: $notify_output${NC}"
+  echo "${GRAY}    warn mostrado:   $warn_output${NC}"
+  _show_file_content "notify" "$NOTIFY"
+  _show_file_content "warn" "$WARN"
+}
 
-if echo "$output" | grep -q "actualizadas"; then
+if echo "$notify_output" | grep -q "actualizadas"; then
+  pass "Notify se muestra al abrir el shell"
+else
+  fail "Notify no se mostró"
+fi
+if [[ ! -f "$NOTIFY" ]]; then
+  pass "Notify se elimina después de mostrarse (one-shot)"
+else
+  fail "Notify no se eliminó"
+fi
+if echo "$warn_output" | grep -q "cambios locales"; then
   pass "Warn se muestra al abrir el shell"
 else
   fail "Warn no se mostró"
 fi
-if [[ ! -f "$WARN" ]]; then
-  pass "Warn se elimina después de mostrarse"
+if [[ -f "$WARN" ]]; then
+  pass "Warn NO se borra al mostrarse (persiste hasta que se resuelva)"
 else
-  fail "Warn no se eliminó"
+  fail "Warn fue borrado — el usuario no lo vería en la próxima terminal"
 fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 6: Repo con cambios locales — pending escrito, warn NO escrito, lock escrito"
+section "TEST 6: Repo con cambios locales — warn escrito, notify NO escrito, lock escrito"
 # ══════════════════════════════════════════════════════════════════════════════
 
 reset_env "localchanges (tiene dirty.txt sin trackear)"
 WATCHED_DIRS=("$REPO_LOCALCHANGES")
 
 run_upgrade
-if [[ -f "$PENDING" ]]; then
-  pass "Cambios locales: pending escrito"
-  if grep -q "cambios locales" "$PENDING"; then
-    pass "Pending menciona los cambios locales"
+if [[ -f "$WARN" ]]; then
+  pass "Cambios locales: warn escrito"
+  if grep -q "cambios locales" "$WARN"; then
+    pass "Warn menciona los cambios locales"
   else
-    fail "Pending no menciona 'cambios locales': $(cat $PENDING)"
+    fail "Warn no menciona 'cambios locales': $(cat $WARN)"
   fi
 else
-  fail "Cambios locales: pending no escrito — el usuario no se entera"
+  fail "Cambios locales: warn no escrito — el usuario no se entera"
 fi
-if [[ ! -f "$WARN" ]] || [[ ! -s "$WARN" ]]; then
-  pass "Cambios locales: warn no escrito (notificación persistente va a pending)"
+if [[ ! -f "$NOTIFY" ]] || [[ ! -s "$NOTIFY" ]]; then
+  pass "Cambios locales: notify no escrito (no hubo actualización)"
 else
-  fail "Cambios locales: warn escrito innecesariamente — contenido: $(cat $WARN)"
+  fail "Cambios locales: notify escrito innecesariamente — contenido: $(cat $NOTIFY)"
 fi
 if [[ -f "$LOCK" && $(cat "$LOCK") == $(date +%Y-%m-%d) ]]; then
   pass "Cambios locales: lock escrito — background no se dispara en cada terminal"
@@ -307,27 +321,27 @@ fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 7: Repo no en main — pending escrito, warn NO escrito, lock escrito"
+section "TEST 7: Repo no en main — warn escrito, notify NO escrito, lock escrito"
 # ══════════════════════════════════════════════════════════════════════════════
 
 reset_env "notmain (en branch feature/test)"
 WATCHED_DIRS=("$REPO_NOTMAIN")
 
 run_upgrade
-if [[ -f "$PENDING" ]]; then
-  pass "Repo en branch no-main: pending escrito"
-  if grep -q "rama no principal" "$PENDING"; then
-    pass "Pending menciona la rama no principal"
+if [[ -f "$WARN" ]]; then
+  pass "Repo en branch no-main: warn escrito"
+  if grep -q "rama no principal" "$WARN"; then
+    pass "Warn menciona la rama no principal"
   else
-    fail "Pending no menciona 'rama no principal': $(cat $PENDING)"
+    fail "Warn no menciona 'rama no principal': $(cat $WARN)"
   fi
 else
-  fail "Repo en branch no-main: pending no escrito"
+  fail "Repo en branch no-main: warn no escrito"
 fi
-if [[ ! -f "$WARN" ]] || [[ ! -s "$WARN" ]]; then
-  pass "Repo en branch no-main: warn no escrito (va a pending)"
+if [[ ! -f "$NOTIFY" ]] || [[ ! -s "$NOTIFY" ]]; then
+  pass "Repo en branch no-main: notify no escrito (no hubo actualización)"
 else
-  fail "Repo en branch no-main: warn escrito innecesariamente"
+  fail "Repo en branch no-main: notify escrito innecesariamente"
 fi
 if [[ -f "$LOCK" && $(cat "$LOCK") == $(date +%Y-%m-%d) ]]; then
   pass "Repo en branch: lock escrito — background no se dispara en cada terminal"
@@ -349,11 +363,11 @@ local force_output
 force_output=$(mw-tools-force-upgrade 2>&1)
 
 [[ $VERBOSE -eq 1 ]] && {
-  echo "${CYAN}  Output de force-upgrade (va a stdout, no a warn ni log):${NC}"
+  echo "${CYAN}  Output de force-upgrade (va a stdout, no a warn/notify/log):${NC}"
   echo "$force_output" | while IFS= read -r line; do echo "${GRAY}    $line${NC}"; done
   echo "${CYAN}  Después:${NC}"
   _show_file_content "warn" "$WARN"
-  _show_file_content "pending" "$PENDING"
+  _show_file_content "notify" "$NOTIFY"
   _show_file_content "lock" "$LOCK"
 }
 
@@ -363,70 +377,34 @@ else
   fail "force-upgrade no corrió el check"
 fi
 if [[ ! -f "$WARN" ]] || [[ ! -s "$WARN" ]]; then
-  pass "force-upgrade: output va a stdout, no al warn"
+  pass "force-upgrade: sin problemas, warn no escrito"
 else
-  fail "force-upgrade: escribió al warn cuando no debería"
+  fail "force-upgrade: warn escrito cuando no debería"
 fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 9: Pending persiste entre aperturas de terminal (no se borra al mostrarse)"
+section "TEST 9: Warn se limpia cuando el check es limpio"
 # ══════════════════════════════════════════════════════════════════════════════
 
-echo "  🚩 mw-tools: cambios locales sin commitear en: /fake/repo" > "$PENDING"
-[[ $VERBOSE -eq 1 ]] && { echo "${CYAN}  Antes:${NC}"; _show_file_content "pending" "$PENDING" }
-
-# Simula lo que hace el startup block: mostrar pending SIN borrarlo
-local pending_output
-pending_output=$(
-  if [[ -f "$PENDING" ]]; then
-    cat "$PENDING"
-  fi
-)
-
-[[ $VERBOSE -eq 1 ]] && {
-  echo "${CYAN}  Después de mostrar (simula 2 aperturas de terminal):${NC}"
-  echo "${GRAY}    output mostrado: $pending_output${NC}"
-  _show_file_content "pending" "$PENDING"
-}
-
-if echo "$pending_output" | grep -q "cambios locales"; then
-  pass "Pending se muestra en la terminal"
-else
-  fail "Pending no se mostró"
-fi
-if [[ -f "$PENDING" ]]; then
-  pass "Pending NO se borra al mostrarse (persiste para la próxima terminal)"
-else
-  fail "Pending fue borrado — el usuario no lo vería en la próxima terminal"
-fi
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-section "TEST 10: Pending se limpia cuando el check es limpio"
-# ══════════════════════════════════════════════════════════════════════════════
-
-# Arrancamos con un pending de una sesión anterior
-echo "  🚩 mw-tools: cambios locales sin commitear en: /fake/repo" > "$PENDING"
+echo "  🚩 mw-tools: cambios locales sin commitear en: /fake/repo" > "$WARN"
 rm -f "$LOCK"
 WATCHED_DIRS=("$REPO_UPTODATE")
 
-[[ $VERBOSE -eq 1 ]] && { echo "${CYAN}  Estado inicial: pending existe de sesión anterior${NC}"; _show_file_content "pending" "$PENDING" }
+[[ $VERBOSE -eq 1 ]] && { echo "${CYAN}  Estado inicial: warn existe de chequeo anterior${NC}"; _show_file_content "warn" "$WARN" }
 
 run_upgrade
 
-if [[ ! -f "$PENDING" ]]; then
-  pass "Check limpio: pending eliminado (problema resuelto)"
+if [[ ! -f "$WARN" ]]; then
+  pass "Check limpio: warn eliminado (problema resuelto)"
 else
-  fail "Check limpio: pending NO eliminado — contenido: $(cat $PENDING)"
+  fail "Check limpio: warn NO eliminado — contenido: $(cat $WARN)"
 fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 11: Race condition — dos shells abren casi simultáneamente"
+section "TEST 10: Race condition — dos shells abren casi simultáneamente"
 # ══════════════════════════════════════════════════════════════════════════════
-# Shell 2 abre antes de que el background de Shell 1 escriba el lock.
-# Ambos backgrounds corren en paralelo. Al menos uno debe actualizar y escribir el warn.
 
 reset_env "needsupdate (con nuevo commit remoto)"
 WATCHED_DIRS=("$REPO_NEEDSUPDATE")
@@ -444,26 +422,26 @@ sleep 0.1
 sleep 3
 [[ $VERBOSE -eq 1 ]] && {
   echo "${CYAN}  Después (ambos BGs terminaron):${NC}"
+  _show_file_content "notify" "$NOTIFY"
   _show_file_content "warn" "$WARN"
-  _show_file_content "pending" "$PENDING"
   _show_file_content "lock" "$LOCK"
   echo "${GRAY}    log:${NC}"
   [[ -f "$LOG" ]] && while IFS= read -r line; do echo "${GRAY}      $line${NC}"; done < "$LOG"
 }
 
-if [[ -f "$WARN" ]]; then
-  pass "Race condition: al menos un BG escribió el warn"
+if [[ -f "$NOTIFY" ]]; then
+  pass "Race condition: al menos un BG escribió el notify"
 else
   if grep -q "actualizadas\|All tools up to date\|✅" "$LOG" 2>/dev/null; then
-    pass "Race condition: repo procesado — si no hay warn es porque el segundo BG vio el lock y el primero ya actualizó"
+    pass "Race condition: repo procesado — el segundo BG vio el lock y el primero ya actualizó"
   else
-    fail "Race condition: warn ausente y sin evidencia de procesamiento"
+    fail "Race condition: notify ausente y sin evidencia de procesamiento"
   fi
 fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "TEST 12: Log se rota a 500 líneas"
+section "TEST 11: Log se rota a 500 líneas"
 # ══════════════════════════════════════════════════════════════════════════════
 
 reset_env "uptodate"
