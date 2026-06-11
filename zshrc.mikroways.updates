@@ -7,6 +7,10 @@ MW_POST_UPDATE_SCRIPTS=(script/install install.sh)
 
 # Last check timestamp file
 GIT_UPDATE_CHECK_FILE="${HOME}/.mw-tools-upgrade.lock"
+# Problemas que requieren acción (persiste en cada terminal hasta que se resuelvan)
+MW_WARN_FILE="${HOME}/.mw-tools-upgrade.warn"
+# Notificaciones de una sola vez (repos actualizados)
+MW_NOTIFY_FILE="${HOME}/.mw-tools-upgrade.notify"
 
 function mw-tools-force-upgrade() {
   echo "Forzando chequeo (ignorando lock diario)..."
@@ -41,7 +45,6 @@ function mw-tools-upgrade() {
   printf '%0.s=' {1..80}; echo
   echo "Checking for Mikroways tools updates...."
   printf '%0.s=' {1..80}; echo
-  echo "$today" > "$GIT_UPDATE_CHECK_FILE"
 
   # Clasificar repos por rama
   for repo_dir in "${WATCHED_DIRS[@]}"; do
@@ -53,9 +56,6 @@ function mw-tools-upgrade() {
       REPOS_MAIN+=( $repo_dir )
     fi
   done
-  if [[ "${#REPOS_NOT_ON_MAIN[@]}" -ne 0 ]]; then
-    [[ $auto_yes -eq 1 ]] && echo "  📢 mw-tools: repos en rama no principal: ${(j:, :)REPOS_NOT_ON_MAIN}" >> "${HOME}/.mw-tools-upgrade.warn"
-  fi
 
   # Verificar cambios locales (solo repos en rama principal)
   for repo_dir in "${REPOS_MAIN[@]}"; do
@@ -69,7 +69,6 @@ function mw-tools-upgrade() {
   done
   if [[ "${#REPOS_WITH_LOCAL_UPDATES[@]}" -ne 0 ]]; then
     echo "  ⚠️  Repos with local changes (skipped): ${(j:, :)REPOS_WITH_LOCAL_UPDATES}"
-    [[ $auto_yes -eq 1 ]] && echo "  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}" >> "${HOME}/.mw-tools-upgrade.warn"
     REPOS_MAIN=("${(@)REPOS_MAIN:|REPOS_WITH_LOCAL_UPDATES_PATHS}")
   fi
 
@@ -146,9 +145,6 @@ function mw-tools-upgrade() {
   done
   rm -rf $tmpdir
 
-  if [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]]; then
-    [[ $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}" >> "${HOME}/.mw-tools-upgrade.warn"
-  fi
   if [[ "${#REPOS_TO_UPDATE[@]}" -eq 0 && "${#REPOS_WITH_FETCH_ERROR[@]}" -eq 0 ]]; then
     printf '%0.s-' {1..80}; echo
     echo "✔️  All tools up to date"
@@ -186,21 +182,43 @@ function mw-tools-upgrade() {
       done
       echo
       [[ "${#REPOS_UPDATED[@]}" -ne 0 ]] && echo "  ✔️  Mikroways tools updated: ${(j:, :)REPOS_UPDATED}"
-      [[ "${#REPOS_UPDATED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_UPDATED}" >> "${HOME}/.mw-tools-upgrade.warn"
+      [[ "${#REPOS_UPDATED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ✔️  mw-tools: actualizadas: ${(j:, :)REPOS_UPDATED}" >> "$MW_NOTIFY_FILE"
       [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && echo "  ❌ Falló el pull de: ${(j:, :)REPOS_PULL_FAILED}"
-      [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 && $auto_yes -eq 1 ]] && echo "  ❌ mw-tools: falló el pull de: ${(j:, :)REPOS_PULL_FAILED}" >> "${HOME}/.mw-tools-upgrade.warn"
     else
       echo "  ❌ Omit updates for Mikroways tools"
     fi
+  fi
+
+  # Siempre escribir el lock para no disparar background en cada terminal
+  echo "$today" > "$GIT_UPDATE_CHECK_FILE"
+
+  # Actualizar .warn con problemas que requieren acción (persiste hasta que se resuelvan)
+  local warn_msgs=()
+  [[ "${#REPOS_NOT_ON_MAIN[@]}" -ne 0 ]] && warn_msgs+=("  📢 mw-tools: repos en rama no principal: ${(j:, :)REPOS_NOT_ON_MAIN}")
+  [[ "${#REPOS_WITH_LOCAL_UPDATES[@]}" -ne 0 ]] && warn_msgs+=("  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}")
+  [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]] && warn_msgs+=("  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}")
+  [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && warn_msgs+=("  ❌ mw-tools: falló el pull de: ${(j:, :)REPOS_PULL_FAILED}")
+
+  if [[ "${#warn_msgs[@]}" -ne 0 ]]; then
+    printf '%s\n' "${warn_msgs[@]}" > "$MW_WARN_FILE"
+  else
+    rm -f "$MW_WARN_FILE"
   fi
 }
 
 
 
-# Mostrar warnings del check anterior y lanzar nuevo check en background
-if [[ -f "${HOME}/.mw-tools-upgrade.warn" ]]; then
-  cat "${HOME}/.mw-tools-upgrade.warn"
-  rm -f "${HOME}/.mw-tools-upgrade.warn"
+# Mostrar problemas que requieren acción (persiste en cada terminal hasta que se resuelvan)
+if [[ -f "$MW_WARN_FILE" ]]; then
+  cat "$MW_WARN_FILE"
+fi
+# Mostrar notificaciones de una sola vez (ej: repos actualizados)
+if [[ -f "$MW_NOTIFY_FILE" ]]; then
+  cat "$MW_NOTIFY_FILE"
+  rm -f "$MW_NOTIFY_FILE"
+fi
+if [[ ! -f "$GIT_UPDATE_CHECK_FILE" || $(cat "$GIT_UPDATE_CHECK_FILE" 2>/dev/null) != "$(date +%Y-%m-%d)" ]]; then
+  echo "  🔄 mw-tools: chequeando actualizaciones en background..."
 fi
 {
   local log="${HOME}/.mw-tools-upgrade.log"
