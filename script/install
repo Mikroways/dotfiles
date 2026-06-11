@@ -9,7 +9,7 @@ mkdir -p "$BACKUP_DIR"
 
 cd "$DIR"
 for file in *; do
-  [[ "$file" =~ (ssh|script|backup|README.*md|.*sample$) ]] && continue
+  [[ "$file" =~ (ssh|script|backup|README.*md|.*sample$|.*\.sh$) ]] && continue
   [ -e "$HOME/.$file" ] && [ ! -L "$HOME/.$file" ] && \
     mv "$HOME/.$file" "$BACKUP_DIR"
   ln -fs "$DIR/$file" "$HOME/.$file"
