@@ -17,6 +17,12 @@ utilizados desde la consola como por ejemplo:
 * git
 * tmux
 
+> **Nota**: si ya tenés archivos de configuración en tu home (`.gitconfig`,
+> `.zshrc`, etc.), el instalador los respalda automáticamente en
+> `./backup/` antes de reemplazarlos con symlinks. Revisa el
+> backup y migra manualmente lo que necesites (ver sección
+> [Personalizaciones de Mikroways y Usuario](#personalizaciones-de-mikroways-y-usuario)).
+
 ## Cómo usar este repositorio
 
 La idea es que cada integrante de Mikroways utilice este repositorio como punto
@@ -25,6 +31,12 @@ configuraciones y proponiéndolas al repositorio raíz, compartiendo experiencia
 que nos hagan más eficientes en el día a día.
 Para ello se puede forkear este repositorio y cualquier contribución realizarla
 como un Pull Request.
+
+> **Atención**: el script `script/install` crea un symlink en el home del
+> usuario para cada archivo del repo que no esté excluido explícitamente. Si
+> agregás un archivo nuevo, revisá [`script/install`](script/install) para
+> verificar que matchee alguna exclusión, o agregá una nueva. De lo contrario
+> **se va a copiar al home de todos los usuarios**.
 
 ### Personalizaciones de Mikroways y Usuario
 
