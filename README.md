@@ -85,6 +85,14 @@ notifica al inicio de la **próxima** sesión de terminal.
   `master` se reportan como advertencia pero no se actualizan automáticamente.
 * **Sin cambios locales**: si un repositorio tiene cambios sin commitear, se
   aborta la actualización y se avisa.
+* **Claves SSH con passphrase**: el chequeo corre en background sin terminal,
+  por lo que nunca pide la passphrase de una clave SSH (evita que el proceso
+  quede colgado o rompa la sesión). Si tu clave la requiere, tenés que tenerla
+  ya cargada en el agente (`ssh-add`) o configurada para desbloquearse sola al
+  iniciar sesión; de lo contrario, el repo correspondiente va a quedar
+  reportado en `.warn` hasta que la cargues. Si corrés `mw-tools-upgrade`
+  manualmente y la autenticación falla, te ofrece correr `ssh-add` y reintentar
+  en el momento.
 * **Notificaciones diferidas**: los avisos se muestran al abrir la siguiente
   terminal, no mientras el chequeo corre en background. Hay dos tipos:
   * **Problemas** (`.warn`): cambios locales sin commitear, repo en rama no
