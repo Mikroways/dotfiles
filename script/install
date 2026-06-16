@@ -30,9 +30,7 @@ for i in es.latin1.spl es.latin1.sug es.utf-8.spl es.utf-8.sug; do
   curl -sfLo "$HOME/.vim/spell/$i" --create-dirs \
     "https://ftp.nluug.nl/pub/vim/runtime/spell/$i"
 done
-# Install vim plugins (solo si hay una terminal interactiva; si este script
-# corre en background -p.ej. desde mw-tools-upgrade- vim no puede pedir
-# input y termina con error)
+# Install vim plugins (solo con terminal interactiva; en background vim falla)
 if [ -t 0 ] && [ -t 1 ]; then
   vim +PlugClean +PlugUpdate +qall
 else

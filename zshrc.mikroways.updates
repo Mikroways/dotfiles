@@ -28,12 +28,8 @@ function mw-tools-upgrade() {
     [[ "$arg" == "-v" ]] && verbose=1
   done
 
-  # Evita que git/ssh queden esperando una passphrase sin tener una
-  # terminal interactiva disponible (esto puede colgar el chequeo en
-  # background o, peor, crashear el agente gráfico de ssh-askpass y
-  # romper la sesión ssh para el resto de la terminal). Si la clave no
-  # está cargada en el agente, el fetch/pull falla rápido y se reporta
-  # como error en lugar de pedir la passphrase.
+  # Evita que ssh pida la passphrase sin terminal (en background colgaría o
+  # crashearía el askpass): si la clave no está cargada, el fetch falla rápido
   local GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10"
   export GIT_SSH_COMMAND
   local GIT_TERMINAL_PROMPT=0
@@ -158,13 +154,8 @@ function mw-tools-upgrade() {
   done
   rm -rf $tmpdir
 
-  # Recuperación interactiva ante fallo de auth SSH.
-  # Los fetch corren en paralelo con BatchMode=yes (ver arriba), así que nunca
-  # piden la passphrase mientras tanto: si la clave no está cargada, fallan con
-  # "Permission denied". Cuando hay una terminal (uso manual, no background),
-  # ofrecemos cargar la clave con ssh-add -que pide la passphrase de forma
-  # limpia, una sola vez- y reintentamos todo el chequeo. El guard
-  # _MW_SSH_RETRY evita ofrecerlo de nuevo si tras el ssh-add sigue fallando.
+  # Si falló la auth SSH y hay terminal (uso manual), ofrecer ssh-add y
+  # reintentar. El guard _MW_SSH_RETRY evita reintentar en loop
   if [[ $auto_yes -eq 0 && -t 0 && $has_auth_error -eq 1 && -z "$_MW_SSH_RETRY" ]]; then
     printf '%0.s-' {1..80}; echo
     echo "  🔑 Falló la autenticación SSH y tu clave no parece estar cargada en el agente."
