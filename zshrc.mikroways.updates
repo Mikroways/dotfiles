@@ -28,6 +28,13 @@ function mw-tools-upgrade() {
     [[ "$arg" == "-v" ]] && verbose=1
   done
 
+  # Evita que ssh pida la passphrase sin terminal (en background colgaría o
+  # crashearía el askpass): si la clave no está cargada, el fetch falla rápido
+  local GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10"
+  export GIT_SSH_COMMAND
+  local GIT_TERMINAL_PROMPT=0
+  export GIT_TERMINAL_PROMPT
+
   local today=$(date +%Y-%m-%d)
   local REPOS_MAIN=()
   local REPOS_TO_UPDATE=()
@@ -37,6 +44,7 @@ function mw-tools-upgrade() {
   local REPOS_WITH_FETCH_ERROR=()
   local REPOS_UPDATED=()
   local REPOS_PULL_FAILED=()
+  local has_auth_error=0
 
   # Verifica si ya se revisó hoy
   if [[ -f "$GIT_UPDATE_CHECK_FILE" && $(cat "$GIT_UPDATE_CHECK_FILE") == "$today" ]]; then
@@ -84,7 +92,7 @@ function mw-tools-upgrade() {
       if err=$(git -C $repo_dir remote update 2>&1 >/dev/null); then
         echo 0 > "$tmpdir/$key.tmp"
       else
-        { echo 1; echo "$err" | grep -E "^(fatal|error|ERROR):" | head -1 } > "$tmpdir/$key.tmp"
+        { echo 1; echo "$err" | grep -E "Permission denied|^(fatal|error|ERROR):" | head -1 } > "$tmpdir/$key.tmp"
       fi
       mv "$tmpdir/$key.tmp" "$tmpdir/$key"
     } &
@@ -126,6 +134,7 @@ function mw-tools-upgrade() {
     if [[ "$fetch_exit" != "0" ]]; then
       echo "❌  $repo_name  ❌  ${fetch_error:-fetch failed}"
       REPOS_WITH_FETCH_ERROR+=( $repo_name )
+      [[ "$fetch_error" == *"Permission denied"* ]] && has_auth_error=1
       continue
     fi
     UPDATES=$(LC_ALL=C git -C $repo_dir status -uno | grep -E "Your branch is behind|have diverged")
@@ -144,6 +153,26 @@ function mw-tools-upgrade() {
     fi
   done
   rm -rf $tmpdir
+
+  # Si falló la auth SSH y hay terminal (uso manual), ofrecer ssh-add y
+  # reintentar. El guard _MW_SSH_RETRY evita reintentar en loop
+  if [[ $auto_yes -eq 0 && -t 0 && $has_auth_error -eq 1 && -z "$_MW_SSH_RETRY" ]]; then
+    printf '%0.s-' {1..80}; echo
+    echo "  🔑 Falló la autenticación SSH y tu clave no parece estar cargada en el agente."
+    local retry_ans
+    printf "  ¿Correr 'ssh-add' y reintentar? [Y/n] (default: Y): "
+    read -r retry_ans
+    if [[ -z "$retry_ans" || "$retry_ans" == [yY] ]]; then
+      if ssh-add; then
+        typeset -g _MW_SSH_RETRY=1
+        mw-tools-upgrade "$@"
+        unset _MW_SSH_RETRY
+        return
+      else
+        echo "  ⚠️  ssh-add no cargó ninguna clave; continúo sin reintentar."
+      fi
+    fi
+  fi
 
   if [[ "${#REPOS_TO_UPDATE[@]}" -eq 0 && "${#REPOS_WITH_FETCH_ERROR[@]}" -eq 0 ]]; then
     printf '%0.s-' {1..80}; echo
@@ -196,7 +225,10 @@ function mw-tools-upgrade() {
   local warn_msgs=()
   [[ "${#REPOS_NOT_ON_MAIN[@]}" -ne 0 ]] && warn_msgs+=("  📢 mw-tools: repos en rama no principal: ${(j:, :)REPOS_NOT_ON_MAIN}")
   [[ "${#REPOS_WITH_LOCAL_UPDATES[@]}" -ne 0 ]] && warn_msgs+=("  🚩 mw-tools: cambios locales sin commitear en: ${(j:, :)REPOS_WITH_LOCAL_UPDATES}")
-  [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]] && warn_msgs+=("  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}")
+  if [[ "${#REPOS_WITH_FETCH_ERROR[@]}" -ne 0 ]]; then
+    warn_msgs+=("  ❌ mw-tools: error al hacer fetch de: ${(j:, :)REPOS_WITH_FETCH_ERROR}")
+    [[ $has_auth_error -eq 1 ]] && warn_msgs+=("     Cargá tu clave SSH en el agente con: ssh-add")
+  fi
   [[ "${#REPOS_PULL_FAILED[@]}" -ne 0 ]] && warn_msgs+=("  ❌ mw-tools: falló el pull de: ${(j:, :)REPOS_PULL_FAILED}")
 
   if [[ "${#warn_msgs[@]}" -ne 0 ]]; then

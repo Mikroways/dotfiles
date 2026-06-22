@@ -34,6 +34,7 @@ REPO_UPTODATE="${TMPDIR_TEST}/fake-repos/uptodate"
 REPO_NEEDSUPDATE="${TMPDIR_TEST}/fake-repos/needsupdate"
 REPO_LOCALCHANGES="${TMPDIR_TEST}/fake-repos/localchanges"
 REPO_NOTMAIN="${TMPDIR_TEST}/fake-repos/notmain"
+REPO_SSHAUTH="${TMPDIR_TEST}/fake-repos/sshauth"
 BARE_NEEDSUPDATE="${TMPDIR_TEST}/bare-needsupdate.git"
 
 setup_fake_repos() {
@@ -69,6 +70,13 @@ setup_fake_repos() {
   git -C "$REPO_NOTMAIN" init -b feature/test -q
   git -C "$REPO_NOTMAIN" commit --allow-empty -m "init" -q
   git -C "$REPO_NOTMAIN" remote add origin "$REPO_NOTMAIN"
+
+  # sshauth: remote por ssh con una clave que requeriría passphrase
+  # (ver fake "ssh" en TEST 12)
+  mkdir -p "$REPO_SSHAUTH"
+  git -C "$REPO_SSHAUTH" init -b main -q
+  git -C "$REPO_SSHAUTH" commit --allow-empty -m "init" -q
+  git -C "$REPO_SSHAUTH" remote add origin "git@fakehost-unreachable:mikroways/repo.git"
 }
 
 # Agrega un commit al remote de needsupdate sin hacer pull local
@@ -460,6 +468,99 @@ if [[ $lines -le 520 ]]; then
   pass "Log rotado correctamente: $lines líneas (límite 500 + output del run)"
 else
   fail "Log no rotado: $lines líneas (debería ser ≤520)"
+fi
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+section "TEST 12: Clave SSH con passphrase — no se cuelga pidiéndola en background"
+# ══════════════════════════════════════════════════════════════════════════════
+# Reproduce el bug reportado: si la clave necesita passphrase y no hay
+# terminal/agente disponible, ssh quedaría esperando input para siempre
+# (o disparando un askpash gráfico que puede crashear). mw-tools-upgrade
+# debe forzar BatchMode=yes para que git/ssh fallen rápido en vez de pedir
+# la passphrase, y reportar el error como un .warn con un hint de ssh-add.
+
+reset_env "sshauth (remote ssh, simula clave bloqueada con passphrase)"
+WATCHED_DIRS=("$REPO_SSHAUTH")
+
+# ssh fake: si recibe BatchMode=yes falla rápido (lo esperable); si no lo
+# recibe, simula quedarse esperando la passphrase (lo que rompía antes).
+mkdir -p "$TMPDIR_TEST/fakebin"
+cat > "$TMPDIR_TEST/fakebin/ssh" <<'FAKESSH'
+#!/bin/sh
+batch=0
+for a in "$@"; do
+  case "$a" in
+    *BatchMode=yes*) batch=1 ;;
+  esac
+done
+if [ "$batch" -eq 1 ]; then
+  echo "git@fakehost-unreachable: Permission denied (publickey)." >&2
+  exit 255
+else
+  sleep 5
+  exit 1
+fi
+FAKESSH
+chmod +x "$TMPDIR_TEST/fakebin/ssh"
+
+local OLDPATH="$PATH"
+export PATH="$TMPDIR_TEST/fakebin:$PATH"
+
+local start_ts=$(date +%s)
+run_upgrade
+local elapsed=$(( $(date +%s) - start_ts ))
+
+export PATH="$OLDPATH"
+
+if [[ $elapsed -le 3 ]]; then
+  pass "No se cuelga esperando la passphrase (terminó en ${elapsed}s, no en >5s)"
+else
+  fail "Se colgó esperando la passphrase (tardó ${elapsed}s) — falta BatchMode=yes"
+fi
+if grep -q "Permission denied" "$LOG"; then
+  pass "El error de auth se reporta en el log"
+else
+  fail "El error de auth no aparece en el log:\n$(cat $LOG)"
+fi
+if [[ -f "$WARN" ]] && grep -q "ssh-add" "$WARN"; then
+  pass "El warn sugiere 'ssh-add' para cargar la clave en el agente"
+else
+  fail "El warn no sugiere ssh-add: $(cat $WARN 2>/dev/null)"
+fi
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+section "TEST 13: Error de fetch NO-auth — el warn NO sugiere ssh-add"
+# ══════════════════════════════════════════════════════════════════════════════
+# Complemento del TEST 12: si el fetch falla por algo que no es autenticación
+# (p.ej. el host no resuelve), el hint de ssh-add no debe aparecer.
+
+reset_env "sshauth (remote ssh, simula host inalcanzable)"
+WATCHED_DIRS=("$REPO_SSHAUTH")
+
+# ssh fake: siempre falla con un error que NO es de auth.
+cat > "$TMPDIR_TEST/fakebin/ssh" <<'FAKESSH'
+#!/bin/sh
+echo "ssh: Could not resolve hostname fakehost-unreachable: Name or service not known" >&2
+exit 255
+FAKESSH
+chmod +x "$TMPDIR_TEST/fakebin/ssh"
+
+OLDPATH="$PATH"
+export PATH="$TMPDIR_TEST/fakebin:$PATH"
+run_upgrade
+export PATH="$OLDPATH"
+
+if [[ -f "$WARN" ]] && grep -q "error al hacer fetch" "$WARN"; then
+  pass "El error de fetch se reporta en el warn"
+else
+  fail "El error de fetch no aparece en el warn: $(cat $WARN 2>/dev/null)"
+fi
+if [[ -f "$WARN" ]] && grep -q "ssh-add" "$WARN"; then
+  fail "El warn sugiere ssh-add ante un error que no es de auth: $(cat $WARN)"
+else
+  pass "El warn NO sugiere ssh-add (el error no era de autenticación)"
 fi
 
 
