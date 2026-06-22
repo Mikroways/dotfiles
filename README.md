@@ -17,9 +17,41 @@ utilizados desde la consola como por ejemplo:
 * git
 * tmux
 
-## Pasos manuales requeridos
+> **Nota**: si ya tenés archivos de configuración en tu home (`.gitconfig`,
+> `.zshrc`, etc.), el instalador los respalda automáticamente en
+> `./backup/` antes de reemplazarlos con symlinks. Revisa el
+> backup y migra manualmente lo que necesites (ver sección
+> [Personalizaciones de Mikroways y Usuario](#personalizaciones-de-mikroways-y-usuario)).
 
-### Configuración personal de git
+## Cómo usar este repositorio
+
+La idea es que cada integrante de Mikroways utilice este repositorio como punto
+de partida, pero personalice su ambiente como mejor le parezca, agregando nuevas
+configuraciones y proponiéndolas al repositorio raíz, compartiendo experiencias
+que nos hagan más eficientes en el día a día.
+Para ello se puede forkear este repositorio y cualquier contribución realizarla
+como un Pull Request.
+
+> **Atención**: el script `script/install` crea un symlink en el home del
+> usuario para cada archivo del repo que no esté excluido explícitamente. Si
+> agregás un archivo nuevo, revisá [`script/install`](script/install) para
+> verificar que matchee alguna exclusión, o agregá una nueva. De lo contrario
+> **se va a copiar al home de todos los usuarios**.
+
+### Personalizaciones de Mikroways y Usuario
+
+Las personalizaciones se pueden hacer en cascada de la siguiente forma:
+
+1. Primero se setean los valores por defecto en `.zshrc`
+1. Luego se personalizan los valores por defecto para Mikroways usando
+   `.zshrc.mikroways`
+1. Finalmente, un usuario puede crear un archivo `.zshrc.user` que idealmente
+   conviene no versionarlo en este repositorio con las personalizaciones que
+   desea sobreescribir
+1. Respecto a los bundles de antigen, es posible aplicar personalizaciones con:
+  `.zshrc.mikroways.antigen.bundles` y `.zshrc.user.antigen.bundles`
+
+#### Configuración personal de git
 
 El archivo `gitconfig.local` contiene datos personales (nombre, email) y **no
 forma parte del repositorio**. Debe crearse directamente en el home:
@@ -40,27 +72,52 @@ El `gitconfig` del repo lo incluye automáticamente vía `[include]`, por lo que
 cualquier valor definido en `~/.gitconfig.local` sobreescribe la configuración
 compartida sin generar cambios en el repositorio.
 
-## Cómo usar este repositorio
+##### Configuración por contexto opcional
 
-La idea es que cada integrante de Mikroways utilice este repositorio como punto
-de partida, pero personalice su ambiente como mejor le parezca, agregando nuevas
-configuraciones y proponiéndolas al repositorio raíz, compartiendo experiencias
-que nos hagan más eficientes en el día a día.
-Para ello se puede forkear este repositorio y cualquier contribución realizarla
-como un Pull Request.
+Si manejás repos con identidades distintas (por ejemplo, repos personales con
+un email distinto al de Mikroways), podés usar `includeIf` en
+`~/.gitconfig.local` para aplicar config adicional según el contexto.
 
-### Personalizaciones de Mikroways y Usuario
+Cada archivo referenciado contiene solo los valores que difieren del default:
 
-Las personalizaciones se pueden hacer en cascada de la siguiente forma:
+```ini
+[user]
+  email = juan@personal.com
+```
 
-1. Primero se setean los valores por defecto en `.zshrc`
-1. Luego se personalizan los valores por defecto para Mikroways usando
-   `.zshrc.mikroways`
-1. Finalmente, un usuario puede crear un archivo `.zshrc.user` que idealmente
-   conviene no versionarlo en este repositorio con las personalizaciones que
-   desea sobreescribir
-1. Respecto a los bundles de antigen, es posible aplicar personalizaciones con:
-  `.zshrc.mikroways.antigen.bundles` y `.zshrc.user.antigen.bundles`
+Hay dos enfoques:
+
+* **Por carpeta (recomendado)**: si tenés una estructura de carpetas clara,
+  por ejemplo `~/personal/` para repos personales, podés usar `gitdir` para
+  aplicar la config a cualquier repo ubicado dentro de esa carpeta:
+
+   ```ini
+   [includeIf "gitdir:~/personal/"]
+     path = ~/.gitconfig.personal
+   ```
+
+* **Por URL del remote**
+
+   Aplica la config a cualquier repo cuyo remote
+   coincida con el patrón, sin importar dónde esté clonado. Hay que agregar
+   un bloque por cada combinación de host y protocolo (SSH y HTTPS):
+
+   ```ini
+   # Requiere git >= 2.36.
+   # Organización en GitHub (SSH y HTTPS)
+   [includeIf "hasconfig:remote.*.url:git@github.com:mi-org/**"]
+     path = ~/.gitconfig.mi-org
+   [includeIf "hasconfig:remote.*.url:https://github.com/mi-org/**"]
+     path = ~/.gitconfig.mi-org
+
+   # GitLab privado — en SSH el separador entre host y ruta es ":" en lugar de "/"
+   [includeIf "hasconfig:remote.*.url:git@gitlab.empresa.com:**"]
+     path = ~/.gitconfig.empresa
+   [includeIf "hasconfig:remote.*.url:https://gitlab.empresa.com/**"]
+     path = ~/.gitconfig.empresa
+   ```
+
+El [`gitconfig.local.sample`](gitconfig.local.sample) incluye ambos ejemplos comentados.
 
 ## Integración con herramientas propias de mikroways
 

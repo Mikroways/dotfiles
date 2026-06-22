@@ -9,9 +9,14 @@ mkdir -p "$BACKUP_DIR"
 
 cd "$DIR"
 for file in *; do
+  # ATENCION: cualquier archivo que no matchee esta exclusion se va a
+  # copiar como symlink al home de todos los usuarios al correr el install.
   [[ "$file" =~ (ssh|script|backup|README.*md|.*sample$|.*\.sh$) ]] && continue
-  [ -e "$HOME/.$file" ] && [ ! -L "$HOME/.$file" ] && \
+  if [ -e "$HOME/.$file" ] && [ ! -L "$HOME/.$file" ]; then
     mv "$HOME/.$file" "$BACKUP_DIR"
+    echo "⚠️  ~/.${file} existente respaldado en $BACKUP_DIR/$file"
+    echo "    Revisa el backup y migra lo que necesites manualmente."
+  fi
   ln -fs "$DIR/$file" "$HOME/.$file"
 done
 
