@@ -28,12 +28,17 @@ function mw-tools-upgrade() {
     [[ "$arg" == "-v" ]] && verbose=1
   done
 
-  # Evita que ssh pida la passphrase sin terminal (en background colgaría o
-  # crashearía el askpass): si la clave no está cargada, el fetch falla rápido
+  # Evita prompts de passphrase sin terminal: BatchMode hace fallar el fetch
+  # rápido si la clave no está cargada; DISPLAY vacío impide que GNOME
+  # Keyring muestre su diálogo gráfico (solo en background, no en uso manual)
   local GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10"
   export GIT_SSH_COMMAND
   local GIT_TERMINAL_PROMPT=0
   export GIT_TERMINAL_PROMPT
+  if [[ $auto_yes -eq 1 ]]; then
+    local DISPLAY=""
+    export DISPLAY
+  fi
 
   local today=$(date +%Y-%m-%d)
   local REPOS_MAIN=()

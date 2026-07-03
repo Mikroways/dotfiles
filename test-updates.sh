@@ -486,15 +486,17 @@ WATCHED_DIRS=("$REPO_SSHAUTH")
 # ssh fake: si recibe BatchMode=yes falla rápido (lo esperable); si no lo
 # recibe, simula quedarse esperando la passphrase (lo que rompía antes).
 mkdir -p "$TMPDIR_TEST/fakebin"
-cat > "$TMPDIR_TEST/fakebin/ssh" <<'FAKESSH'
+local SSH_DISPLAY_LOG="$TMPDIR_TEST/ssh-display.log"
+cat > "$TMPDIR_TEST/fakebin/ssh" <<FAKESSH
 #!/bin/sh
+echo "DISPLAY=\${DISPLAY}" >> "$SSH_DISPLAY_LOG"
 batch=0
-for a in "$@"; do
-  case "$a" in
+for a in "\$@"; do
+  case "\$a" in
     *BatchMode=yes*) batch=1 ;;
   esac
 done
-if [ "$batch" -eq 1 ]; then
+if [ "\$batch" -eq 1 ]; then
   echo "git@fakehost-unreachable: Permission denied (publickey)." >&2
   exit 255
 else
@@ -527,6 +529,11 @@ if [[ -f "$WARN" ]] && grep -q "ssh-add" "$WARN"; then
   pass "El warn sugiere 'ssh-add' para cargar la clave en el agente"
 else
   fail "El warn no sugiere ssh-add: $(cat $WARN 2>/dev/null)"
+fi
+if [[ -f "$SSH_DISPLAY_LOG" ]] && grep -q "^DISPLAY=$" "$SSH_DISPLAY_LOG"; then
+  pass "DISPLAY vacío en background: GNOME Keyring no puede mostrar diálogos"
+else
+  fail "DISPLAY no está vacío en background — GNOME Keyring podría mostrar prompts: $(cat $SSH_DISPLAY_LOG 2>/dev/null)"
 fi
 
 
