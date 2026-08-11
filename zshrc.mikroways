@@ -33,7 +33,7 @@ export MW_GITLAB_CLONE="$HOME/.mikroways/tools/mw-gitlab-clone"
 [[ -x $MW_GITLAB_CLONE/mw-gitlab-clone ]] && export PATH="$MW_GITLAB_CLONE:$PATH"
 
 # Enable md2pdf
-export MW_MD2PDF="$HOME/.mikroways/tools/md2pdf"
+export MW_MD2PDF="$HOME/.mikroways/tools/mw-md2pdf"
 [[ -x $MW_MD2PDF/bin/md2pdf ]] && export PATH="$MW_MD2PDF/bin:$PATH"
 
 # Enable grant ssh access
