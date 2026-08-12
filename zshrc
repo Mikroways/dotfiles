@@ -50,6 +50,13 @@ antigen theme romkatv/powerlevel10k
 # Tell Antigen that you're done.
 antigen apply
 
+# The kubectl plugin regenerates its completion asynchronously (&|) on every
+# shell start; with asdf's kubectl shim that write can lose the race against
+# compinit, leaving `kubectl` completing as a command but not subcommands or
+# resources. Regenerate it synchronously here, after compinit/compdef are
+# fully initialized, so every new session gets a working completion.
+(( $+functions[mw-fix-kube-completion] )) && mw-fix-kube-completion
+
 # Do not share history between sessions
 unsetopt share_history
 
