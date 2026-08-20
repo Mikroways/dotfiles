@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 DIR=$(realpath "$(dirname "$0")/../")
 BACKUP_DIR=$DIR/backup
@@ -20,19 +20,28 @@ for file in *; do
   ln -fs "$DIR/$file" "$HOME/.$file"
 done
 
-mkdir -p $HOME/.ssh/config.d
+[ -e "$DIR/ssh/config" ] || { echo "❌ No existe $DIR/ssh/config, abortando" >&2; exit 1; }
+
+mkdir -p "$HOME/.ssh"
+
+[ -e "$HOME/.ssh/config.d" ] && [ ! -d "$HOME/.ssh/config.d" ] && \
+  mkdir -p "$BACKUP_DIR/.ssh" && \
+  mv "$HOME/.ssh/config.d" "$BACKUP_DIR/.ssh/config.d"
+mkdir -p "$HOME/.ssh/config.d"
+
 [ -e "$HOME/.ssh/config" ] && [ ! -L "$HOME/.ssh/config" ] && \
   mkdir -p "$BACKUP_DIR/.ssh" && \
   mv "$HOME/.ssh/config" "$BACKUP_DIR/.ssh/config"
-mkdir -p "$HOME/.ssh"
 ln -fs "$DIR/ssh/config" "$HOME/.ssh/config"
 
 # Install vim-plug as autoload
 curl -sfLo "$HOME/.vim/autoload/plug.vim" --create-dirs \
+  --retry 3 --max-time 30 \
   https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 # Install vim spell check es
 for i in es.latin1.spl es.latin1.sug es.utf-8.spl es.utf-8.sug; do
   curl -sfLo "$HOME/.vim/spell/$i" --create-dirs \
+    --retry 3 --max-time 30 \
     "https://ftp.nluug.nl/pub/vim/runtime/spell/$i"
 done
 # Install vim plugins (solo con terminal interactiva; en background vim falla)
