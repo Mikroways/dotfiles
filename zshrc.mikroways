@@ -50,19 +50,22 @@ export MW_BOOTSTRAP_ROOT="$HOME/.mikroways/tools/mw-bootstrap"
 if [ -d "$HOME/.mikroways/tools/mw-skills/sources" ]; then
   for _mw_skill_dir in "$HOME/.mikroways/tools/mw-skills/sources"/*/skills/*/; do
     [[ -d "$_mw_skill_dir" ]] || continue
+    # El glob deja un "/" final; readlink nunca lo devuelve, así que se
+    # normaliza antes de comparar para no recrear el symlink en cada shell.
+    _mw_skill_dir_norm="${_mw_skill_dir%/}"
     _mw_skill_name=$(basename "$_mw_skill_dir")
     _mw_claude_target="$HOME/.claude/skills/$_mw_skill_name"
-    if [[ "$(readlink "$_mw_claude_target" 2>/dev/null)" != "$_mw_skill_dir" ]]; then
+    if [[ "$(readlink "$_mw_claude_target" 2>/dev/null)" != "$_mw_skill_dir_norm" ]]; then
       [[ -L "$_mw_claude_target" || -e "$_mw_claude_target" ]] && rm -f "$_mw_claude_target"
-      ln -s "$_mw_skill_dir" "$_mw_claude_target" 2>/dev/null
+      ln -s "$_mw_skill_dir_norm" "$_mw_claude_target" 2>/dev/null
     fi
     _mw_gemini_target="$HOME/.gemini/skills/$_mw_skill_name"
-    if [[ "$(readlink "$_mw_gemini_target" 2>/dev/null)" != "$_mw_skill_dir" ]] && command -v gemini &>/dev/null; then
+    if [[ "$(readlink "$_mw_gemini_target" 2>/dev/null)" != "$_mw_skill_dir_norm" ]] && command -v gemini &>/dev/null; then
       [[ -L "$_mw_gemini_target" || -e "$_mw_gemini_target" ]] && rm -f "$_mw_gemini_target"
-      gemini skills link "$_mw_skill_dir" --consent 2>/dev/null
+      gemini skills link "$_mw_skill_dir_norm" --consent 2>/dev/null
     fi
   done
-  unset _mw_skill_dir _mw_skill_name _mw_claude_target _mw_gemini_target
+  unset _mw_skill_dir _mw_skill_dir_norm _mw_skill_name _mw_claude_target _mw_gemini_target
 fi
 
 # -----------------------------------------------------------------------------
