@@ -46,27 +46,36 @@ export MW_BOOTSTRAP_ROOT="$HOME/.mikroways/tools/mw-bootstrap"
   fpath=($MW_BOOTSTRAP_ROOT/shell-completion/zsh $fpath)
 
 # Enable mw skills (Claude Code + gemini-cli)
-# Los skills viven en cada marco; sparse clones bajo ~/.mikroways/tools/mw-skills/sources/
-if [ -d "$HOME/.mikroways/tools/mw-skills/sources" ]; then
-  for _mw_skill_dir in "$HOME/.mikroways/tools/mw-skills/sources"/*/skills/*/; do
-    [[ -d "$_mw_skill_dir" ]] || continue
+# Las skills viven en ~/.mikroways/tools/mw-skills/skills/ o en los repos que
+# lista su archivo SKILLS, con sparse clones bajo sources/. Si una está en los
+# dos lugares es que se está mudando, y gana la de skills/.
+_mw_skills_root="$HOME/.mikroways/tools/mw-skills"
+if [ -d "$_mw_skills_root" ]; then
+  for _mw_skill_dir in "$_mw_skills_root"/sources/*/skills/*/(N) "$_mw_skills_root"/skills/*/(N); do
     # El glob deja un "/" final; readlink nunca lo devuelve, así que se
     # normaliza antes de comparar para no recrear el symlink en cada shell.
     _mw_skill_dir_norm="${_mw_skill_dir%/}"
     _mw_skill_name=$(basename "$_mw_skill_dir")
+    if [[ "$_mw_skill_dir" == "$_mw_skills_root"/sources/* && -d "$_mw_skills_root/skills/$_mw_skill_name" ]]; then
+      continue
+    fi
     _mw_claude_target="$HOME/.claude/skills/$_mw_skill_name"
-    if [[ "$(readlink "$_mw_claude_target" 2>/dev/null)" != "$_mw_skill_dir_norm" ]]; then
-      [[ -L "$_mw_claude_target" || -e "$_mw_claude_target" ]] && rm -f "$_mw_claude_target"
+    # Un directorio real no se pisa: puede ser una skill escrita a mano.
+    if [[ -d "$_mw_claude_target" && ! -L "$_mw_claude_target" ]]; then
+      :
+    elif [[ "$(readlink "$_mw_claude_target" 2>/dev/null)" != "$_mw_skill_dir_norm" ]]; then
+      rm -f "$_mw_claude_target"
       ln -s "$_mw_skill_dir_norm" "$_mw_claude_target" 2>/dev/null
     fi
     _mw_gemini_target="$HOME/.gemini/skills/$_mw_skill_name"
     if [[ "$(readlink "$_mw_gemini_target" 2>/dev/null)" != "$_mw_skill_dir_norm" ]] && command -v gemini &>/dev/null; then
-      [[ -L "$_mw_gemini_target" || -e "$_mw_gemini_target" ]] && rm -f "$_mw_gemini_target"
+      [[ -L "$_mw_gemini_target" ]] && rm -f "$_mw_gemini_target"
       gemini skills link "$_mw_skill_dir_norm" --consent 2>/dev/null
     fi
   done
   unset _mw_skill_dir _mw_skill_dir_norm _mw_skill_name _mw_claude_target _mw_gemini_target
 fi
+unset _mw_skills_root
 
 # -----------------------------------------------------------------------------
 # Enable krew
