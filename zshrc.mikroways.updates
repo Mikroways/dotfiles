@@ -59,8 +59,11 @@ function mw-tools-upgrade() {
   echo "Checking for Mikroways tools updates...."
   printf '%0.s=' {1..80}; echo
 
-  # Clasificar repos por rama
+  # Clasificar repos por rama. WATCHED_DIRS se arma al abrir la terminal, y un
+  # repo puede haber desaparecido desde entonces (el install.sh de mw-skills
+  # borra los clones de los orígenes que salen de SKILLS): esos se saltean.
   for repo_dir in "${WATCHED_DIRS[@]}"; do
+    [[ -d "$repo_dir/.git" ]] || continue
     IS_MAIN_BRANCH=$(LC_ALL=C git -C $repo_dir rev-parse --abbrev-ref HEAD | grep -iE "^(main|master)$")
     if [[ -z "$IS_MAIN_BRANCH" ]]; then
       echo "  📢 Repository is not using main branch for $repo_dir. Please review"
@@ -199,6 +202,12 @@ function mw-tools-upgrade() {
     fi
     if [[ "$answer" == "y" ]]; then
       for repo_dir in "${REPOS_TO_UPDATE[@]}"; do
+        # El post-update de un repo anterior puede haberlo borrado en esta
+        # misma corrida (install.sh de mw-skills): no es un pull fallido.
+        if [[ ! -d "$repo_dir/.git" ]]; then
+          echo "  🗑️  $repo_dir ya no existe: lo borró la actualización de otro repo"
+          continue
+        fi
         if git -C $repo_dir pull; then
           REPOS_UPDATED+=( $repo_dir )
           for _post_script in "${MW_POST_UPDATE_SCRIPTS[@]}"; do

@@ -572,6 +572,83 @@ fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+section "TEST 14: Un repo borrado por el install.sh de otro no da error de pull"
+# ══════════════════════════════════════════════════════════════════════════════
+# El caso real: el install.sh de mw-skills borra los clones de sources/ de los
+# orígenes que salieron de SKILLS. Esos clones ya estaban en la lista de repos a
+# actualizar, y el pull de cada uno fallaba con "cannot change to".
+
+reset_env "parent (su install.sh borra child) y child, los dos con update"
+REPO_PARENT="${TMPDIR_TEST}/fake-repos/parent"
+REPO_CHILD="${TMPDIR_TEST}/fake-repos/child"
+for name in parent child; do
+  local dir="${TMPDIR_TEST}/fake-repos/$name" bare="${TMPDIR_TEST}/bare-$name.git"
+  mkdir -p "$dir"
+  git -C "$dir" init -b main -q
+  if [[ $name == parent ]]; then
+    printf '#!/bin/sh\nrm -rf "%s"\n' "$REPO_CHILD" > "$dir/install.sh"
+    chmod +x "$dir/install.sh"
+    git -C "$dir" add install.sh
+  fi
+  git -C "$dir" commit --allow-empty -m "v1" -q
+  git clone --bare -q "$dir" "$bare"
+  git -C "$dir" remote add origin "$bare"
+  git -C "$dir" fetch -q
+  git -C "$dir" branch -q --set-upstream-to=origin/main main
+  local tmp="${TMPDIR_TEST}/tmp-push-$name"
+  git clone --local -q "$bare" "$tmp" 2>/dev/null
+  git -C "$tmp" commit --allow-empty -m "v2" -q
+  git -C "$tmp" push -q origin main 2>/dev/null
+  rm -rf "$tmp"
+done
+WATCHED_DIRS=("$REPO_PARENT" "$REPO_CHILD")
+
+run_upgrade
+if [[ ! -d "$REPO_CHILD" ]]; then
+  pass "El install.sh de parent borró child (el escenario se armó bien)"
+else
+  fail "child sigue existiendo: el escenario no reproduce el caso"
+fi
+if grep -q "Error al actualizar\|Falló el pull" "$LOG"; then
+  fail "El repo borrado aparece como error de pull: $(grep -m1 'Error al actualizar\|Falló el pull' $LOG)"
+else
+  pass "El repo borrado no aparece como error de pull"
+fi
+if [[ -f "$WARN" ]] && grep -q "falló el pull" "$WARN"; then
+  fail "El warn reporta un pull fallido por el repo borrado: $(cat $WARN)"
+else
+  pass "El warn no reporta pulls fallidos"
+fi
+if grep -q "ya no existe" "$LOG"; then
+  pass "El log dice que el repo ya no existe"
+else
+  fail "El log no explica qué pasó con el repo borrado"
+fi
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+section "TEST 15: Un repo que ya no existe al empezar no da error de fetch"
+# ══════════════════════════════════════════════════════════════════════════════
+# WATCHED_DIRS se arma al abrir la terminal: la corrida siguiente, en la misma
+# terminal, todavía tiene los clones que borró la anterior.
+
+reset_env "uptodate y un directorio que ya no existe"
+WATCHED_DIRS=("$REPO_UPTODATE" "${TMPDIR_TEST}/fake-repos/borrado")
+
+run_upgrade
+if [[ -f "$WARN" ]] && grep -q "error al hacer fetch\|rama no principal" "$WARN"; then
+  fail "El directorio borrado aparece en el warn: $(cat $WARN)"
+else
+  pass "El directorio borrado no aparece como error"
+fi
+if grep -q "fake-repos/borrado" "$LOG"; then
+  fail "El log menciona el directorio borrado: $(grep -m1 'fake-repos/borrado' $LOG)"
+else
+  pass "El directorio borrado se saltea sin ruido"
+fi
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 echo "\n${BOLD}$(printf '─%.0s' {1..50})${NC}"
 echo "Resultados: ${GREEN}${BOLD}${PASS} PASS${NC}  ${RED}${BOLD}${FAIL} FAIL${NC}"
 echo "${BOLD}$(printf '─%.0s' {1..50})${NC}"
